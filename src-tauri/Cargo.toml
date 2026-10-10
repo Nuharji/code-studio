@@ -1,0 +1,27 @@
+[package]
+name = "code-studio"
+version = "0.1.0"
+description = "A JetBrains-style IDE in the Studio family look"
+edition = "2021"
+rust-version = "1.77"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-clipboard-manager = "2"
+serde = { version = "1", features = ["derive"] }
+ignore = "0.4"
+regex = "1"
+trash = "5"
+portable-pty = "0.8"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
