@@ -392,6 +392,7 @@ select:focus,input:focus{border-color:var(--accent)}
       <div class="panel-tabs"><span id="bottomTabs" style="display:flex;min-width:0;overflow:hidden"></span><span class="flex"></span><span id="bottomBtns" style="display:flex"></span>
         <button class="ibtn" data-act="toggleBottom" data-tip="a.hidePanel"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button></div>
       <div class="panel-body">
+        <div class="ppanel" data-pp="problems"><div class="find-sum" id="problemSum"></div><div id="problemList" style="flex:1;overflow:auto"></div></div>
         <div class="ppanel" data-pp="find"><div class="find-sum" id="findSum"></div><div id="findList" style="flex:1;overflow:auto"></div></div>
         <div class="ppanel" data-pp="terminal"><div id="terms" style="position:absolute;inset:0"></div></div>
       </div>
@@ -416,6 +417,8 @@ select:focus,input:focus{border-color:var(--accent)}
   <span id="stState" class="st-state"></span>
   <div class="crumbs" id="crumbs"></div>
   <span class="flex"></span>
+  <button id="stProblems" hidden></button>
+  <button id="stLsp" hidden></button>
   <button id="stPos" data-act="goToLine"></button>
   <button id="stEol"></button>
   <span id="stEnc"></span>
@@ -437,6 +440,7 @@ select:focus,input:focus{border-color:var(--accent)}
 <script src="vendor/monaco/vs/loader.js"></script>
 <script src="native.js"></script>
 <script src="symbols.js"></script>
+<script src="lsp.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -63,11 +63,17 @@ const I18N = {
     'toast.saved': 'Saved {n} files', 'toast.saveFail': 'Could not save: {e}', 'toast.openFail': 'Could not open: {e}', 'toast.binary': '“{name}” is a binary file and can’t be edited here.',
     'toast.tooBig': '“{name}” is too large to open (over 20 MB).', 'toast.copied': 'Copied', 'toast.reloaded': '“{name}” changed on disk and was reloaded.',
     'toast.conflict': '“{name}” changed on disk, but you have unsaved changes here — your version is kept.', 'toast.replaced': 'Replaced {n} matches', 'toast.noFolder': 'That folder doesn’t exist anymore.',
-    'toast.created': 'Project created', 'toast.fail': 'Failed: {e}', 'toast.reverted': 'Reverted — Ctrl+Z undoes it', 'toast.noDef': 'Not available for this language yet (stage 2 adds language servers).',
+    'toast.created': 'Project created', 'toast.fail': 'Failed: {e}', 'toast.reverted': 'Reverted — Ctrl+Z undoes it', 'toast.noDef': 'Needs a language server for this language (see the status bar).',
     'toast.termFail': 'Terminal could not start: {e}', 'toast.needProject': 'Open a project first.',
     'about.version': 'Version {v}', 'about.p1': 'Code Studio is the IDE of the Studio family: projects, a fast editor, Search Everywhere and a terminal — in the same look as Markdown, PDF and Data Studio.',
     'about.p2': 'Built with Rust + Tauri. Editor: <a href="https://microsoft.github.io/monaco-editor/">Monaco</a> (MIT), terminal: <a href="https://xtermjs.org">xterm.js</a> (MIT).',
     'about.p3': 'Coming next: language servers (autocomplete across files, go to declaration, rename everywhere, inspections), then run configurations and Git.',
+    'a.findUsages': 'Find Usages', 'a.quickFix': 'Show Quick Fixes', 'a.quickDoc': 'Quick Documentation', 'a.parameterInfo': 'Parameter Info',
+    'a.goToImplementation': 'Go to Implementation', 'a.toggleProblems': 'Problems', 'ui.problems': 'Problems', 'ui.noProblems': 'No problems found in open files.',
+    'ui.problemsSum': '{e} errors, {w} warnings in {f} files', 'ui.usagesOf': 'Usages of {name}', 'toast.noRename': 'This can’t be renamed.',
+    'toast.noUsages': 'No usages found.', 'lsp.missing': '{name} not installed', 'lsp.starting': '{name} starting…', 'lsp.ready': '{name}', 'lsp.crashed': '{name} stopped',
+    'lsp.installTitle': 'Install {name}', 'lsp.installText': 'Code Studio uses {name} for autocomplete across files, go to declaration, find usages, rename and live errors. Install it with this command (it runs in the terminal):',
+    'lsp.installRun': 'Run in terminal', 'lsp.installAfter': 'When it’s done, reopen the project (File → Close Project, then open it again).',
     'sc.double': 'Double Shift', 'sc.editor': 'In the editor', 'sc.multi': 'Add a cursor', 'sc.multiKey': 'Alt+Click', 'sc.suggest': 'Autocomplete', 'sc.suggestKey': 'Ctrl+Space'
   },
   de: {
@@ -124,11 +130,17 @@ const I18N = {
     'toast.saved': '{n} Dateien gespeichert', 'toast.saveFail': 'Speichern fehlgeschlagen: {e}', 'toast.openFail': 'Öffnen fehlgeschlagen: {e}', 'toast.binary': '„{name}“ ist eine Binärdatei und kann hier nicht bearbeitet werden.',
     'toast.tooBig': '„{name}“ ist zu groß (über 20 MB).', 'toast.copied': 'Kopiert', 'toast.reloaded': '„{name}“ wurde außerhalb geändert und neu geladen.',
     'toast.conflict': '„{name}“ wurde außerhalb geändert, du hast hier aber ungespeicherte Änderungen — deine Version bleibt.', 'toast.replaced': '{n} Treffer ersetzt', 'toast.noFolder': 'Dieser Ordner existiert nicht mehr.',
-    'toast.created': 'Projekt erstellt', 'toast.fail': 'Fehlgeschlagen: {e}', 'toast.reverted': 'Zurückgesetzt — Strg+Z macht es rückgängig', 'toast.noDef': 'Für diese Sprache noch nicht verfügbar (Stufe 2 bringt Language Server).',
+    'toast.created': 'Projekt erstellt', 'toast.fail': 'Fehlgeschlagen: {e}', 'toast.reverted': 'Zurückgesetzt — Strg+Z macht es rückgängig', 'toast.noDef': 'Dafür braucht diese Sprache einen Language Server (siehe Statusleiste).',
     'toast.termFail': 'Terminal konnte nicht starten: {e}', 'toast.needProject': 'Öffne zuerst ein Projekt.',
     'about.version': 'Version {v}', 'about.p1': 'Code Studio ist die IDE der Studio-Familie: Projekte, ein schneller Editor, „Überall suchen“ und ein Terminal — im selben Look wie Markdown, PDF und Data Studio.',
     'about.p2': 'Gebaut mit Rust + Tauri. Editor: <a href="https://microsoft.github.io/monaco-editor/">Monaco</a> (MIT), Terminal: <a href="https://xtermjs.org">xterm.js</a> (MIT).',
     'about.p3': 'Als Nächstes: Language Server (Autovervollständigung über Dateien hinweg, Gehe zur Deklaration, überall umbenennen, Inspektionen), danach Ausführungskonfigurationen und Git.',
+    'a.findUsages': 'Verwendungen suchen', 'a.quickFix': 'Schnellkorrekturen', 'a.quickDoc': 'Schnelldokumentation', 'a.parameterInfo': 'Parameterinfo',
+    'a.goToImplementation': 'Gehe zur Implementierung', 'a.toggleProblems': 'Probleme', 'ui.problems': 'Probleme', 'ui.noProblems': 'Keine Probleme in geöffneten Dateien.',
+    'ui.problemsSum': '{e} Fehler, {w} Warnungen in {f} Dateien', 'ui.usagesOf': 'Verwendungen von {name}', 'toast.noRename': 'Das kann nicht umbenannt werden.',
+    'toast.noUsages': 'Keine Verwendungen gefunden.', 'lsp.missing': '{name} nicht installiert', 'lsp.starting': '{name} startet…', 'lsp.ready': '{name}', 'lsp.crashed': '{name} beendet',
+    'lsp.installTitle': '{name} installieren', 'lsp.installText': 'Code Studio nutzt {name} für Autovervollständigung über Dateien hinweg, Gehe zur Deklaration, Verwendungen suchen, Umbenennen und Live-Fehler. Installiere es mit diesem Befehl (er läuft im Terminal):',
+    'lsp.installRun': 'Im Terminal ausführen', 'lsp.installAfter': 'Wenn er fertig ist, öffne das Projekt neu (Datei → Projekt schließen, dann wieder öffnen).',
     'sc.double': '2× Umschalt', 'sc.editor': 'Im Editor', 'sc.multi': 'Cursor hinzufügen', 'sc.multiKey': 'Alt+Klick', 'sc.suggest': 'Autovervollständigung', 'sc.suggestKey': 'Strg+Leertaste'
   }
 };
@@ -175,6 +187,8 @@ const dirName = p => p.slice(0, Math.max(0, p.search(/[\\/][^\\/]*$/)));
 const relPath = p => project && p.startsWith(project.root) ? p.slice(project.root.length).replace(/^[\\/]/, '').replace(/\\/g, '/') : p;
 const absPath = r => join(project.root, r.replace(/\//g, sep));
 const isUnder = (p, dir) => p === dir || p.startsWith(dir + sep);
+/* One spelling per file: Windows drive letters in upper case (Monaco and language servers may use c:\…). */
+const canon = p => /^[a-z]:[\\/]/.test(p) ? p[0].toUpperCase() + p.slice(1) : p;
 const extOf = p => { const n = baseName(p).toLowerCase(), i = n.lastIndexOf('.'); return i > 0 ? n.slice(i + 1) : ''; };
 
 /* ================= Monaco ================= */
@@ -239,7 +253,7 @@ const avText = name => { const w = name.replace(/[^\p{L}\p{N}]+/gu, ' ').trim().
 const sessionKey = root => 'code-studio:project:' + root.toLowerCase();
 
 async function openProject(root, opts = {}) {
-  root = root.replace(/[\\/]+$/, '');
+  root = canon(root.replace(/[\\/]+$/, ''));
   try { await invoke('list_dir', {path: root}); } catch (e) { toast(t('toast.noFolder')); recentProjects = recentProjects.filter(p => p.path !== root); renderRecent(); saveState(); return false; }
   if (project) await closeProject(true);
   sep = root.includes('\\') ? '\\' : '/';
@@ -282,6 +296,7 @@ async function closeProject(switching) {
   if (!project) return;
   if (dirtyFiles().length) { if (settings.autoSave) await saveAll(true); else if (await ask(t('confirm.close'), t('confirm.saveAll'), t('confirm.discard'))) await saveAll(true); }
   saveSession();
+  LSP.stopAll();
   for (const term of terms) invoke('term_kill', {id: term.id}).catch(() => {});
   terms.forEach(x => { x.xterm.dispose(); x.el.remove(); }); terms = []; activeTerm = null;
   groups.forEach(g => { g.tabs = []; g.active = null; });
@@ -357,6 +372,7 @@ function focusGroup(g) {
 }
 
 async function loadFile(path, quiet) {
+  path = canon(path);
   if (files.has(path)) return files.get(path);
   const name = baseName(path), ext = extOf(path);
   let bytes;
@@ -377,6 +393,7 @@ async function loadFile(path, quiet) {
   const old = monaco.editor.getModel(uri); if (old) old.dispose();
   const model = monaco.editor.createModel(text, langFor(path), uri);
   const f = {path, kind: 'text', model, saved: model.getAlternativeVersionId(), bom, mtime: 0};
+  LSP.attach(model);
   [f.mtime] = await invoke('stat_files', {paths: [path]});
   files.set(path, f);
   return f;
@@ -388,6 +405,7 @@ function disposeFile(f) {
 /* Opens a file in a group (the focused one by default) and optionally jumps to a line/column. */
 async function openFile(path, o = {}) {
   if (!project) return;
+  path = canon(path);
   const g = o.group != null ? groups[o.group] || groups[0] : curGroup();
   const before = currentLocation();
   const f = await loadFile(path, o.quiet);
@@ -460,6 +478,7 @@ async function saveFile(f) {
     const text = (f.bom ? '﻿' : '') + f.model.getValue();
     f.mtime = await writeText(f.path, text);
     f.saved = id;
+    LSP.saved(f.path);
     return true;
   } catch (e) { toast(t('toast.saveFail', {e})); return false; }
 }
@@ -694,6 +713,7 @@ function updateStatus() {
   const o = m.getOptions();
   $('#stIndent').textContent = o.insertSpaces ? t('st.spaces', {n: o.tabSize}) : t('st.tab');
   $('#stLang').textContent = langName(m.getLanguageId());
+  renderLspStatus();
 }
 $('#stEol').onclick = () => { const f = curFile(); if (!f || f.kind !== 'text') return; f.model.pushEOL(f.model.getEOL() === '\r\n' ? monaco.editor.EndOfLineSequence.LF : monaco.editor.EndOfLineSequence.CRLF); updateStatus(); };
 $('#stIndent').onclick = () => { const f = curFile(); if (!f || f.kind !== 'text') return; const o = f.model.getOptions(); f.model.updateOptions({insertSpaces: !o.insertSpaces}); updateStatus(); };
@@ -957,7 +977,7 @@ async function findInFilesPopup(replace, dir) {
   if (replace) $('#fifR').value = findState.repl;
   const prev = monaco.editor.create($('#fifPrev'), {...editorOptions(), readOnly: true, minimap: {enabled: false}, model: null, lineNumbers: 'on', stickyScroll: {enabled: false}, fontSize: Math.max(11, settings.fontSize - 1)});
   let prevModel = null, deco = [], hits = [], idx = 0, seq = 0;
-  p.dispose = () => { prev.dispose(); if (prevModel && !files.has(prevModel.uri.fsPath)) prevModel.dispose(); };
+  p.dispose = () => { prev.dispose(); if (prevModel) prevModel.dispose(); };
   const sync = () => {
     $$('[data-tog]').forEach(b => b.classList.toggle('on', !!findState[b.dataset.tog]));
     $$('#fifScope button').forEach(b => b.classList.toggle('active', b.dataset.scope === findState.scope));
@@ -1031,7 +1051,7 @@ function renderFind() {
   const box = $('#findList'), hits = findState.hits;
   if (!findState.query) { $('#findSum').textContent = ''; box.innerHTML = `<div class="empty">${esc(t('ui.findEmpty'))}</div>`; return; }
   const g = groupHits(hits);
-  $('#findSum').innerHTML = esc(t('ui.findSum', {n: num(hits.length), f: num(g.size), q: findState.query.query}));
+  $('#findSum').innerHTML = esc(findState.query.usages ? t('ui.usagesOf', {name: findState.query.query}) + ' · ' + t('ui.findSum', {n: num(hits.length), f: num(g.size), q: findState.query.query}) : t('ui.findSum', {n: num(hits.length), f: num(g.size), q: findState.query.query}));
   let html = '', i = 0;
   for (const [path, list] of g) {
     html += `<div class="file-group">${fileIcon(path)}<span>${esc(baseName(path))}</span><small>${esc(relPath(dirName(path)))} · ${list.length}</small></div>`;
@@ -1126,7 +1146,9 @@ function showBottom(tab) {
   }
 }
 function renderBottomTabs() {
-  const tabs = [`<button class="pt${settings.bottomTab === 'find' ? ' active' : ''}" data-bt="find">${esc(t('ui.find'))}</button>`,
+  const pc = problemCount();
+  const tabs = [`<button class="pt${settings.bottomTab === 'problems' ? ' active' : ''}" data-bt="problems">${esc(t('ui.problems'))}${pc.e + pc.w ? ` <span style="opacity:.7">${pc.e + pc.w}</span>` : ''}</button>`,
+    `<button class="pt${settings.bottomTab === 'find' ? ' active' : ''}" data-bt="find">${esc(t('ui.find'))}</button>`,
     ...terms.map(tm => `<button class="pt${settings.bottomTab === 'terminal' && tm === activeTerm ? ' active' : ''}" data-term="${tm.n}">${esc(tm.title)}${tm.exited ? ' ✕' : ''}<span class="x" data-term-close="${tm.n}">&#10005;</span></button>`)];
   if (!terms.length) tabs.push(`<button class="pt${settings.bottomTab === 'terminal' ? ' active' : ''}" data-bt="terminal">${esc(t('ui.terminal'))}</button>`);
   $('#bottomTabs').innerHTML = tabs.join('');
@@ -1139,6 +1161,74 @@ $('#bottomTabs').addEventListener('click', e => {
   const tb = e.target.closest('[data-term]'); if (tb) { activeTerm = terms.find(x => x.n === +tb.dataset.term); settings.bottomTab = 'terminal'; showBottom(); renderBottomTabs(); return; }
   const b = e.target.closest('[data-bt]'); if (b) showBottom(b.dataset.bt);
 });
+
+/* ================= Problems (from language servers) ================= */
+function problemCount() {
+  let e = 0, w = 0;
+  for (const list of LSP.diags.values()) for (const d of list) { if (d.severity === 1) e++; else if (d.severity === 2) w++; }
+  return {e, w, f: LSP.diags.size};
+}
+function renderProblems() {
+  const box = $('#problemList'); if (!box) return;
+  const pc = problemCount();
+  $('#problemSum').textContent = pc.e + pc.w ? t('ui.problemsSum', {e: num(pc.e), w: num(pc.w), f: num(pc.f)}) : '';
+  let html = '';
+  const sev = ['', '#d7373f', '#e68619', '#378ef0', '#7f8c99'];
+  for (const [path, list] of [...LSP.diags].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const shown = list.filter(d => d.severity <= 2); if (!shown.length) continue;
+    html += `<div class="file-group">${fileIcon(path)}<span>${esc(baseName(path))}</span><small>${esc(relPath(dirName(path)))} · ${shown.length}</small></div>`;
+    for (const d of shown.sort((a, b) => a.severity - b.severity || a.line - b.line))
+      html += `<div class="hit" data-prob="${esc(path)}|${d.line}|${d.col}" style="font-family:var(--font-ui)"><span class="ln" style="color:${sev[d.severity]}">${d.severity === 1 ? '⛔' : '⚠'} ${d.line}</span><span class="tx">${esc(d.message.split('\n')[0])}</span></div>`;
+  }
+  box.innerHTML = html || `<div class="empty">${esc(t('ui.noProblems'))}</div>`;
+}
+$('#problemList').addEventListener('click', e => { const el = e.target.closest('[data-prob]'); if (!el) return; const [p, l, c] = el.dataset.prob.split('|'); jumpTo(p, +l, +c); });
+let lspT;
+LSP.onChange(() => { clearTimeout(lspT); lspT = setTimeout(() => { renderProblems(); renderBottomTabs(); renderLspStatus(); }, 120); });
+async function renderLspStatus() {
+  const el = $('#stLsp'), f = curFile(), pc = problemCount();
+  $('#stProblems').hidden = !project || !(pc.e + pc.w);
+  $('#stProblems').innerHTML = `<span style="color:var(--danger)">⛔ ${pc.e}</span> <span style="color:var(--warn)">⚠ ${pc.w}</span>`;
+  const s = f && f.kind === 'text' ? await LSP.status(f.model.getLanguageId()) : null;
+  el.hidden = !s;
+  if (!s) return;
+  el.dataset.state = s.state;
+  el.textContent = s.state === 'indexing' ? `${s.name}: ${s.text}` : t('lsp.' + (s.state === 'ready' ? 'ready' : s.state), {name: s.name});
+  el.style.color = s.state === 'missing' || s.state === 'crashed' ? 'var(--warn)' : '';
+  el.title = s.text || '';
+}
+$('#stProblems').onclick = () => showBottom('problems');
+$('#stLsp').onclick = async () => {
+  const f = curFile(); if (!f || f.kind !== 'text') return;
+  const s = await LSP.status(f.model.getLanguageId());
+  if (!s || s.state !== 'missing') return;
+  modal(t('lsp.installTitle', {name: s.name}), `<p>${esc(t('lsp.installText', {name: s.name}))}</p><p><kbd>${esc(s.install)}</kbd></p><p>${esc(t('lsp.installAfter'))}</p>`, [
+    {label: t('ui.cancel'), onClick: closeModal},
+    {label: t('lsp.installRun'), primary: true, onClick: async () => {
+      closeModal(); await newTerminal();
+      const tm = activeTerm; for (let i = 0; i < 40 && tm && tm.id == null; i++) await new Promise(r => setTimeout(r, 100));
+      if (tm && tm.id != null) invoke('term_write', {id: tm.id, data: s.install + '\r'});
+    }}]);
+};
+/* Find Usages (Alt+F7): the language server's references, shown in the Find panel. */
+async function findUsages() {
+  const ed = curEditor(); if (!ed) return;
+  if (!LSP.hasClient(ed.getModel().getLanguageId())) { if (smart(ed)) return edCmd('editor.action.goToReferences')(); return toast(t('toast.noDef')); }
+  const word = ed.getModel().getWordAtPosition(ed.getPosition());
+  const refs = await LSP.references(ed.getModel(), ed.getPosition());
+  if (!refs.length) return toast(t('toast.noUsages'));
+  const texts = new Map();
+  for (const r of refs) {
+    if (!texts.has(r.path)) {
+      const f = files.get(r.path);
+      texts.set(r.path, f && f.kind === 'text' ? f.model.getLinesContent() : await readBytes(r.path).then(b => new TextDecoder().decode(b).split(/\r?\n/), () => []));
+    }
+    const line = texts.get(r.path)[r.line - 1] || '';
+    r.rel = relPath(r.path); r.text = line.length > 300 ? line.slice(0, 300) + '…' : line;
+  }
+  findState.hits = refs; findState.query = {query: word ? word.word : '', usages: true};
+  renderFind(); showBottom('find');
+}
 
 /* ================= Local history ================= */
 async function localHistory(path = curPath()) {
@@ -1237,7 +1327,7 @@ const ICONS = {
   gear: svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'),
   help: svg('<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/>'),
   refresh: svg('<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>'), collapse: svg('<path d="m7 20 5-5 5 5M7 4l5 5 5-5"/>'),
-  target: svg('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>'), plus: svg('<path d="M12 5v14M5 12h14"/>')
+  target: svg('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>'), plus: svg('<path d="M12 5v14M5 12h14"/>'), problems: svg('<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17v.01"/>')
 };
 const edCmd = (id, args) => () => { const ed = curEditor(); if (!ed) return; ed.focus(); ed.trigger('studio', id, args || null); };
 const togglePanel = tab => () => {
@@ -1251,6 +1341,8 @@ const setPref = (k, v) => { settings[k] = v; applySettings(); };
 const copyText = async text => { await Native.clipboardWrite(text); toast(t('toast.copied')); };
 function showDock(tab) { settings.dock = true; settings.dockTab = tab; applyLayout(); }
 const DEF_LANGS = ['typescript', 'javascript', 'css', 'scss', 'less', 'json', 'html'];
+/* Declarations, usages and rename need a language server (or Monaco's own TypeScript/CSS/HTML support). */
+const smart = ed => DEF_LANGS.includes(ed.getModel().getLanguageId()) || LSP.hasClient(ed.getModel().getLanguageId());
 const A = {
   newProject, openFolder: async () => { const p = await invoke('pick_folder'); if (p) openProject(p); }, closeProject: () => closeProject(false),
   newFile: () => newFile(), newFolder: () => newFolder(), saveAll: () => saveAll(), localHistory: () => localHistory(),
@@ -1277,15 +1369,18 @@ const A = {
   searchEverywhere: () => searchEverywhere('all'), goToFile: () => searchEverywhere('files'), goToSymbol: () => searchEverywhere('symbols'), findAction: () => searchEverywhere('actions'),
   recentFiles: recentFilesPopup, goToLine, back: () => navGo(-1), forward: () => navGo(1), selectInProject: () => selectInProject(),
   nextTab: () => cycleTab(1), prevTab: () => cycleTab(-1),
-  goToDefinition: () => { const ed = curEditor(); if (!ed) return; if (!DEF_LANGS.includes(ed.getModel().getLanguageId())) return toast(t('toast.noDef')); edCmd('editor.action.revealDefinition')(); },
+  goToDefinition: () => { const ed = curEditor(); if (!ed) return; if (!smart(ed)) return toast(t('toast.noDef')); edCmd('editor.action.revealDefinition')(); },
   formatCode: () => { const ed = curEditor(); if (!ed) return; const s = ed.getSelection(); edCmd(s && !s.isEmpty() ? 'editor.action.formatSelection' : 'editor.action.formatDocument')(); },
   commentLine: edCmd('editor.action.commentLine'), blockComment: edCmd('editor.action.blockComment'),
   renameSymbol: () => {
     if (document.activeElement && document.activeElement.closest('#tree') && tree.sel && tree.sel !== project.root) return renamePath(tree.sel);
     const ed = curEditor(); if (!ed) return;
-    if (!DEF_LANGS.includes(ed.getModel().getLanguageId())) return toast(t('toast.noDef'));
+    if (!smart(ed)) return toast(t('toast.noDef'));
     edCmd('editor.action.rename')();
   },
+  findUsages, quickFix: edCmd('editor.action.quickFix'), quickDoc: edCmd('editor.action.showHover'), parameterInfo: edCmd('editor.action.triggerParameterHints'),
+  goToImplementation: () => { const ed = curEditor(); if (!ed) return; if (!LSP.hasClient(ed.getModel().getLanguageId())) return toast(t('toast.noDef')); edCmd('editor.action.goToImplementation')(); },
+  toggleProblems: toggleBottomTab('problems'),
   fold: edCmd('editor.fold'), unfold: edCmd('editor.unfold'), foldAll: edCmd('editor.foldAll'), unfoldAll: edCmd('editor.unfoldAll'),
   newTerminal: () => newTerminal(), refreshTree: async () => { fileList = null; await refreshTree(true); },
   collapseTree: () => { tree.expanded = new Set([project.root]); renderTree(); saveSession(); }, refreshTodo,
@@ -1316,14 +1411,15 @@ const MENUS = [
     ['expandSelection', 'Ctrl+W'], ['shrinkSelection', 'Ctrl+Shift+W'], ['addNextOccurrence', 'Alt+J'], ['selectAllOccurrences', 'Ctrl+Alt+Shift+J'], '-',
     ['find', 'Ctrl+F'], ['replace', 'Ctrl+R'], ['findInFiles', 'Ctrl+Shift+F'], ['replaceInFiles', 'Ctrl+Shift+R'], '-', ['copyPath', 'Ctrl+Shift+C'], ['copyRelPath', 'Ctrl+Alt+Shift+C']]],
   ['view', [['toggleProject', 'Alt+1', () => settings.dock && settings.dockTab === 'project'], ['toggleStructure', 'Alt+7', () => settings.dock && settings.dockTab === 'structure'],
-    ['toggleTodo', 'Alt+6', () => settings.dock && settings.dockTab === 'todo'], ['toggleFind', 'Alt+3', () => settings.bottom && settings.bottomTab === 'find'],
+    ['toggleTodo', null, () => settings.dock && settings.dockTab === 'todo'], ['toggleFind', 'Alt+3', () => settings.bottom && settings.bottomTab === 'find'],
+    ['toggleProblems', 'Alt+6', () => settings.bottom && settings.bottomTab === 'problems'],
     ['toggleTerminal', 'Alt+F12', () => settings.bottom && settings.bottomTab === 'terminal'], '-',
     ['togglePanels', 'Ctrl+\\', () => settings.dock], ['toggleBottom', null, () => settings.bottom], ['hideAll', 'Ctrl+Shift+F12'], '-',
     ['splitRight'], ['unsplit'], '-', ['wordWrap', null, () => settings.wordWrap], ['minimap', null, () => settings.minimap], ['whitespace', null, () => settings.whitespace]]],
   ['navigate', [['searchEverywhere', 'Shift Shift', null, true], ['goToFile', 'Ctrl+Shift+N'], ['goToSymbol', 'Ctrl+Alt+Shift+N'], ['findAction', 'Ctrl+Shift+A', null, false, ['F1']],
     ['recentFiles', 'Ctrl+E'], '-', ['goToLine', 'Ctrl+G'], ['back', 'Ctrl+Alt+ArrowLeft'], ['forward', 'Ctrl+Alt+ArrowRight'], '-',
-    ['goToDefinition', 'Ctrl+B'], ['selectInProject', 'Alt+F1'], '-', ['nextTab', 'Alt+ArrowRight'], ['prevTab', 'Alt+ArrowLeft']]],
-  ['code', [['formatCode', 'Ctrl+Alt+L'], ['commentLine', 'Ctrl+/'], ['blockComment', 'Ctrl+Shift+/', null, false, ['Ctrl+?']], '-', ['renameSymbol', 'Shift+F6'], '-',
+    ['goToDefinition', 'Ctrl+B'], ['goToImplementation', 'Ctrl+Alt+B'], ['findUsages', 'Alt+F7'], ['selectInProject', 'Alt+F1'], '-', ['nextTab', 'Alt+ArrowRight'], ['prevTab', 'Alt+ArrowLeft']]],
+  ['code', [['quickFix', 'Alt+Enter'], ['quickDoc', 'Ctrl+Q'], ['parameterInfo', 'Ctrl+P'], '-', ['formatCode', 'Ctrl+Alt+L'], ['commentLine', 'Ctrl+/'], ['blockComment', 'Ctrl+Shift+/', null, false, ['Ctrl+?']], '-', ['renameSymbol', 'Shift+F6'], '-',
     ['fold', 'Ctrl+-'], ['unfold', 'Ctrl+=', null, false, ['Ctrl++']], ['foldAll', 'Ctrl+Shift+-', null, false, ['Ctrl+_']], ['unfoldAll', 'Ctrl+Shift+=']]],
   ['settings', [['settings', 'Ctrl+Alt+S'], '-', '#menu.language',
     ['langAuto', null, () => settings.lang === 'auto'], ['langEn', null, () => settings.lang === 'en'], ['langDe', null, () => settings.lang === 'de'],
@@ -1335,7 +1431,7 @@ const MENUS = [
 const KEYMAP = {};
 MENUS.forEach(([, items]) => items.forEach(it => { if (!Array.isArray(it)) return; if (it[1] && !it[3]) KEYMAP[it[1]] = it[0]; (it[4] || []).forEach(k => KEYMAP[k] = it[0]); }));
 const NEEDS_EDITOR = new Set(['undo', 'redo', 'duplicateLine', 'deleteLine', 'moveLineUp', 'moveLineDown', 'expandSelection', 'shrinkSelection', 'addNextOccurrence',
-  'selectAllOccurrences', 'find', 'replace', 'goToLine', 'goToDefinition', 'formatCode', 'commentLine', 'blockComment', 'fold', 'unfold', 'foldAll', 'unfoldAll', 'localHistory']);
+  'selectAllOccurrences', 'find', 'replace', 'goToLine', 'goToDefinition', 'goToImplementation', 'findUsages', 'quickFix', 'quickDoc', 'parameterInfo', 'formatCode', 'commentLine', 'blockComment', 'fold', 'unfold', 'foldAll', 'unfoldAll', 'localHistory']);
 const NO_PROJECT = new Set(['newProject', 'openFolder', 'settings', 'langAuto', 'langEn', 'langDe', 'themeDark', 'themeLight', 'themeGithub', 'themeGithubDark',
   'shortcuts', 'about', 'togglePanels', 'hideAll', 'wordWrap', 'minimap', 'whitespace', 'findAction', 'searchEverywhere']);
 function allowed(act) {
@@ -1394,7 +1490,7 @@ function buildToolbars() {
   fill('#navBtns', [['back', ICONS.back], ['forward', ICONS.forward], ['goToFile', ICONS.file], ['recentFiles', ICONS.recent], ['findInFiles', ICONS.findFiles]]);
   fill('#viewBtns', [['toggleTerminal', ICONS.terminal], ['toggleBottom', ICONS.bottom], ['togglePanels', ICONS.panel], ['settings', ICONS.gear], ['shortcuts', ICONS.help]]);
   const tools = $('#tools'); tools.innerHTML = '';
-  [['toggleProject', ICONS.project], ['toggleStructure', ICONS.structure], ['toggleTodo', ICONS.todo], '-', ['toggleFind', ICONS.find], ['toggleTerminal', ICONS.terminal], '-',
+  [['toggleProject', ICONS.project], ['toggleStructure', ICONS.structure], ['toggleTodo', ICONS.todo], '-', ['toggleFind', ICONS.find], ['toggleProblems', ICONS.problems], ['toggleTerminal', ICONS.terminal], '-',
     ['commentLine', ICONS.comment], ['formatCode', ICONS.format], ['duplicateLine', ICONS.duplicate], ['foldAll', ICONS.fold], ['unfoldAll', ICONS.unfold], '-', ['localHistory', ICONS.history]]
     .forEach(r => { if (r === '-') { const s = document.createElement('div'); s.className = 'sep'; tools.append(s); } else tools.append(makeBtn(...r)); });
   $('#layoutSeg').innerHTML = [['layoutSingle', 'ui.single'], ['layoutSplit', 'ui.split']].map(([a, l]) => `<button data-act="${a}" title="${esc(t('a.' + a))}">${esc(t(l))}</button>`).join('');
@@ -1465,7 +1561,7 @@ function applyLayout() {
   $('#bottom').hidden = !showB; $('#bottomSplit').hidden = !showB;
   renderBottomTabs();
   const on = {toggleProject: settings.dock && settings.dockTab === 'project', toggleStructure: settings.dock && settings.dockTab === 'structure', toggleTodo: settings.dock && settings.dockTab === 'todo',
-    toggleFind: showB && settings.bottomTab === 'find', toggleTerminal: showB && settings.bottomTab === 'terminal', togglePanels: settings.dock, toggleBottom: showB};
+    toggleFind: showB && settings.bottomTab === 'find', toggleProblems: showB && settings.bottomTab === 'problems', toggleTerminal: showB && settings.bottomTab === 'terminal', togglePanels: settings.dock, toggleBottom: showB};
   for (const [a, v] of Object.entries(on)) $$(`[data-act="${a}"]`).forEach(b => b.classList.toggle('active', v));
 
   if (showB) setTimeout(fitTerms, 20);
@@ -1611,7 +1707,7 @@ if (window.Native) {
     }
     if (e.target.closest('.group-ed .ed-host') && curEditor()) {
       return [{id: 'ed:cut', label: t('ctx.cut'), accel: 'Ctrl+X'}, {id: 'ed:copy', label: t('ctx.copy'), accel: 'Ctrl+C'}, {id: 'ed:paste', label: t('ctx.paste'), accel: 'Ctrl+V'}, null,
-        item('goToDefinition'), item('renameSymbol'), null, item('formatCode'), item('commentLine'), null,
+        item('goToDefinition'), item('findUsages'), item('renameSymbol'), item('quickFix'), null, item('formatCode'), item('commentLine'), null,
         item('find'), item('findInFiles'), null, item('localHistory'), item('selectInProject'), item('copyPath')];
     }
     const hit = e.target.closest('#findList .hit');

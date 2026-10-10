@@ -1,6 +1,7 @@
 // Hide the console window in release builds on Windows.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod lsp;
 mod terminal;
 
 use serde::{Deserialize, Serialize};
@@ -502,6 +503,7 @@ fn main() {
         })
         .manage(Initial(Mutex::new(initial)))
         .manage(terminal::Terminals::default())
+        .manage(lsp::Servers::default())
         .invoke_handler(tauri::generate_handler![
             list_dir,
             read_file,
@@ -528,7 +530,11 @@ fn main() {
             terminal::term_start,
             terminal::term_write,
             terminal::term_resize,
-            terminal::term_kill
+            terminal::term_kill,
+            lsp::lsp_check,
+            lsp::lsp_start,
+            lsp::lsp_send,
+            lsp::lsp_stop
         ])
         .run(tauri::generate_context!())
         .expect("error while running Code Studio");

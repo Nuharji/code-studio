@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.0 — 2026-10-10
+- Code intelligence through language servers (stage 2): autocomplete across files, documentation on hover (Ctrl+Q), parameter info (Ctrl+P), Go to Declaration (Ctrl+B / Ctrl+Click) and Implementation (Ctrl+Alt+B) — also into other files, Find Usages (Alt+F7), Rename everywhere (Shift+F6), quick fixes (Alt+Enter), Reformat Code with the language's formatter.
+- Live errors and warnings in the editor and in the new Problems panel (Alt+6); counts in the status bar.
+- Supported: Rust (rust-analyzer), Python (Pyright) and TypeScript/JavaScript (typescript-language-server). The status bar shows the server's state (e.g. indexing) and offers to install a missing one in the terminal.
+- Fixed: files could open twice when a path was spelled with a lower-case drive letter.
 ## 0.1.0 — 2026-10-10
 - First version of Code Studio, the IDE of the Studio family (stage 1 of 3): same layout and themes as Markdown, PDF and Data Studio.
 - Projects: open a folder or create one from a template (Rust, Node.js + TypeScript, Python, static website, empty); recent projects on the start screen; tabs and layout are remembered per project.
