@@ -1560,9 +1560,7 @@ function applyLayout() {
   const showB = settings.bottom && !!project;
   $('#bottom').hidden = !showB; $('#bottomSplit').hidden = !showB;
   renderBottomTabs();
-  const on = {toggleProject: settings.dock && settings.dockTab === 'project', toggleStructure: settings.dock && settings.dockTab === 'structure', toggleTodo: settings.dock && settings.dockTab === 'todo',
-    toggleFind: showB && settings.bottomTab === 'find', toggleProblems: showB && settings.bottomTab === 'problems', toggleTerminal: showB && settings.bottomTab === 'terminal', togglePanels: settings.dock, toggleBottom: showB};
-  for (const [a, v] of Object.entries(on)) $$(`[data-act="${a}"]`).forEach(b => b.classList.toggle('active', v));
+  // Like Markdown Studio: toolbar and rail buttons don't stay highlighted; the panel tabs show what's open.
 
   if (showB) setTimeout(fitTerms, 20);
   saveState();

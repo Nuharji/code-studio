@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.3 — 2026-10-10
+- Toolbar and tool-rail buttons no longer stay outlined when their panel is open — like in Markdown Studio; the panel tabs show what's open.
+
 ## 0.2.2 — 2026-10-10
 - Icon fades swapped: dark themes now show the dark fade and light themes the light fade — in the menu bar, on the start screen and in the taskbar.
 
