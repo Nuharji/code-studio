@@ -520,7 +520,7 @@ dependencies = [
 
 [[package]]
 name = "code-studio"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "ignore",
  "portable-pty",
@@ -3784,6 +3784,7 @@ dependencies = [
  "gtk",
  "heck 0.5.0",
  "http",
+ "image",
  "jni",
  "libc",
  "log",

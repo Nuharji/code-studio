@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 — 2026-10-10
+- The app icon follows the theme: a light fade in dark themes, a dark fade in light themes — in the menu bar, on the start screen and in the window/taskbar icon.
+- All Studio icons now have exactly the same rounded corners.
+
 ## 0.2.0 — 2026-10-10
 - Code intelligence through language servers (stage 2): autocomplete across files, documentation on hover (Ctrl+Q), parameter info (Ctrl+P), Go to Declaration (Ctrl+B / Ctrl+Click) and Implementation (Ctrl+Alt+B) — also into other files, Find Usages (Alt+F7), Rename everywhere (Shift+F6), quick fixes (Alt+Enter), Reformat Code with the language's formatter.
 - Live errors and warnings in the editor and in the new Problems panel (Alt+6); counts in the status bar.
