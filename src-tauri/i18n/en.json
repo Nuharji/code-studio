@@ -284,5 +284,8 @@
   "sp.fix.a-an": "Write “{s}”",
   "sp.fix.i": "Write “I”",
   "sp.unknown": "Unknown word: “{w}”",
-  "sp.source": "Spelling"
+  "sp.source": "Spelling",
+  "a.toggleAutoHide": "Auto-Hide Bars",
+  "set.autoHide": "Hide the bars automatically — they slide in at the screen edge (Alt shows the top bars)",
+  "set.layout": "Layout"
 }

@@ -28,7 +28,7 @@ const fmtKey = k => {
 /* ================= Settings & state ================= */
 const STORE = 'code-studio';
 const THEMES = ['dark', 'light', 'github', 'github-dark'];
-const DEF = {lang: 'auto', theme: 'dark', dock: true, dockTab: 'project', dockW: 320, bottom: false, bottomTab: 'terminal', bottomH: 260,
+const DEF = {autoHide: false, lang: 'auto', theme: 'dark', dock: true, dockTab: 'project', dockW: 320, bottom: false, bottomTab: 'terminal', bottomH: 260,
   fontSize: 14, tabSize: 4, wordWrap: false, minimap: true, whitespace: false, sticky: true, ligatures: true,
   autoSave: true, singleClick: true, reopen: true, shell: '', spell: 'auto'};
 let settings = {...DEF}, recentProjects = [], booted = false;
@@ -1201,6 +1201,7 @@ const DEF_LANGS = ['typescript', 'javascript', 'css', 'scss', 'less', 'json', 'h
 /* Declarations, usages and rename need a language server (or Monaco's own TypeScript/CSS/HTML support). */
 const smart = ed => DEF_LANGS.includes(ed.getModel().getLanguageId()) || LSP.hasClient(ed.getModel().getLanguageId());
 const A = {
+  toggleAutoHide: () => { settings.autoHide = !settings.autoHide; applySettings(); },
   newProject, openFolder: async () => { const p = await invoke('pick_folder'); if (p) openProject(p); }, closeProject: () => closeProject(false),
   newFile: () => newFile(), newFolder: () => newFolder(), saveAll: () => saveAll(), localHistory: () => localHistory(),
   closeTab: () => closeTab(curGroup(), curPath()), closeAllTabs: async () => { for (const g of [...groups]) await closeTabs(g, null); },
@@ -1271,7 +1272,7 @@ const MENUS = [
     ['toggleTodo', null, () => settings.dock && settings.dockTab === 'todo'], ['toggleFind', 'Alt+3', () => settings.bottom && settings.bottomTab === 'find'],
     ['toggleProblems', 'Alt+6', () => settings.bottom && settings.bottomTab === 'problems'],
     ['toggleTerminal', 'Alt+F12', () => settings.bottom && settings.bottomTab === 'terminal'], '-',
-    ['togglePanels', 'Ctrl+\\', () => settings.dock], ['toggleBottom', null, () => settings.bottom], ['hideAll', 'Ctrl+Shift+F12'], '-',
+    ['togglePanels', 'Ctrl+\\', () => settings.dock], ['toggleAutoHide', null, () => settings.autoHide], ['toggleBottom', null, () => settings.bottom], ['hideAll', 'Ctrl+Shift+F12'], '-',
     ['splitRight'], ['unsplit'], '-', ['wordWrap', null, () => settings.wordWrap], ['minimap', null, () => settings.minimap], ['whitespace', null, () => settings.whitespace]]],
   ['navigate', [['searchEverywhere', 'Shift Shift', null, true], ['goToFile', 'Ctrl+Shift+N'], ['goToSymbol', 'Ctrl+Alt+Shift+N'], ['findAction', 'Ctrl+Shift+A', null, false, ['F1']],
     ['recentFiles', 'Ctrl+E'], '-', ['goToLine', 'Ctrl+G'], ['back', 'Ctrl+Alt+ArrowLeft'], ['forward', 'Ctrl+Alt+ArrowRight'], '-',
@@ -1289,7 +1290,7 @@ const KEYMAP = {};
 MENUS.forEach(([, items]) => items.forEach(it => { if (!Array.isArray(it)) return; if (it[1] && !it[3]) KEYMAP[it[1]] = it[0]; (it[4] || []).forEach(k => KEYMAP[k] = it[0]); }));
 const NEEDS_EDITOR = new Set(['undo', 'redo', 'duplicateLine', 'deleteLine', 'moveLineUp', 'moveLineDown', 'expandSelection', 'shrinkSelection', 'addNextOccurrence',
   'selectAllOccurrences', 'find', 'replace', 'goToLine', 'goToDefinition', 'goToImplementation', 'findUsages', 'quickFix', 'quickDoc', 'parameterInfo', 'formatCode', 'commentLine', 'blockComment', 'fold', 'unfold', 'foldAll', 'unfoldAll', 'localHistory']);
-const NO_PROJECT = new Set(['newProject', 'openFolder', 'settings', 'langAuto', 'langEn', 'langDe', 'themeDark', 'themeLight', 'themeGithub', 'themeGithubDark',
+const NO_PROJECT = new Set(['toggleAutoHide', 'newProject', 'openFolder', 'settings', 'langAuto', 'langEn', 'langDe', 'themeDark', 'themeLight', 'themeGithub', 'themeGithubDark',
   'shortcuts', 'about', 'togglePanels', 'hideAll', 'wordWrap', 'minimap', 'whitespace', 'findAction', 'searchEverywhere']);
 function allowed(act) {
   if (NO_PROJECT.has(act)) return true;
@@ -1475,7 +1476,8 @@ function renderSettings() {
   const body = {
     general: `<h3>${t('set.language')}</h3><p class="hint">${t('set.languageHint')}</p>
       <select class="wide-sel" data-sel="lang">${opt('auto', t('a.langAuto'), settings.lang)}${opt('en', 'English', settings.lang)}${opt('de', 'Deutsch', settings.lang)}</select>
-      <h3>${t('set.startup')}</h3>${sw('reopen', t('set.reopen'))}${sw('autoSave', t('set.autoSave'))}${sw('singleClick', t('set.singleClick'))}`,
+      <h3>${t('set.startup')}</h3>${sw('reopen', t('set.reopen'))}${sw('autoSave', t('set.autoSave'))}${sw('singleClick', t('set.singleClick'))}
+      <h3>${t('set.layout')}</h3>${sw('autoHide', t('set.autoHide'))}`,
     appearance: `<h3>${t('set.theme')}</h3><div class="theme-grid">` + THEMES.map(th =>
       `<button class="theme-card${settings.theme === th ? ' active' : ''}" data-theme-pick="${th}">${mock(th)}
        <div class="theme-name">${esc(t('theme.' + th))}<span>${settings.theme === th ? '&#10003;' : ''}</span></div></button>`).join('') + `</div>`,
@@ -1519,6 +1521,7 @@ function applyLanguage() {
 }
 let lastSpell = null;
 function applySettings() {
+  if (window.AutoHide) AutoHide.set(settings.autoHide);
   if (settings.spell !== lastSpell) { const first = lastSpell === null; lastSpell = settings.spell; if (!first && window.monaco) spellRerun(); }
   if (!THEMES.includes(settings.theme)) settings.theme = 'dark';
   const nl = effectiveLang();

@@ -284,5 +284,8 @@
   "sp.fix.a-an": "„{s}“ schreiben",
   "sp.fix.i": "„I“ schreiben",
   "sp.unknown": "Unbekanntes Wort: „{w}“",
-  "sp.source": "Rechtschreibung"
+  "sp.source": "Rechtschreibung",
+  "a.toggleAutoHide": "Leisten automatisch ausblenden",
+  "set.autoHide": "Leisten automatisch ausblenden — sie erscheinen am Bildschirmrand (Alt zeigt die oberen Leisten)",
+  "set.layout": "Layout"
 }

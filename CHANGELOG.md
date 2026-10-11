@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.4.0 — 2026-10-11
+- New: Auto-hide bars (View menu, or Settings → General). The menu bar, toolbar, tool rail and status bar leave the window and slide in when the mouse touches their edge; they stay while a menu is open or you type in them. Alt alone shows the top bars (Escape or a click elsewhere hides them).
+
 ## 0.3.0 — 2026-10-11
 - Spelling & grammar check, German and English, entirely on your PC: comments in code — and the whole text of Markdown and plain-text files — get squiggles for unknown words and grammar hints. Strings and code are skipped; words that also occur as identifiers in the file count as known.
 - Fixes in the right-click menu and in Quick Fix (Ctrl+.): suggestions, “Add to dictionary” (a personal dictionary shared by all Studio apps), “Ignore”.
