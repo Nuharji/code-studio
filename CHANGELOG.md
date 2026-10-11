@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0 — 2026-10-11
+- Spelling & grammar check, German and English, entirely on your PC: comments in code — and the whole text of Markdown and plain-text files — get squiggles for unknown words and grammar hints. Strings and code are skipped; words that also occur as identifiers in the file count as known.
+- Fixes in the right-click menu and in Quick Fix (Ctrl+.): suggestions, “Add to dictionary” (a personal dictionary shared by all Studio apps), “Ignore”.
+- Settings → Editor → Spelling & grammar: Automatic (German + English), German, English or Off.
+- The portable .zip now includes the dictionaries (separate files with their own licenses, see dictionaries/README.md); the bare portable .exe has no spell check.
+
 ## 0.2.6 — 2026-10-11
 - Search Everywhere: matching and ranking of files, symbols and actions now run in the Rust core (same results as before; the project file list no longer travels to the UI for every keystroke).
 

@@ -30,7 +30,7 @@ const STORE = 'code-studio';
 const THEMES = ['dark', 'light', 'github', 'github-dark'];
 const DEF = {lang: 'auto', theme: 'dark', dock: true, dockTab: 'project', dockW: 320, bottom: false, bottomTab: 'terminal', bottomH: 260,
   fontSize: 14, tabSize: 4, wordWrap: false, minimap: true, whitespace: false, sticky: true, ligatures: true,
-  autoSave: true, singleClick: true, reopen: true, shell: ''};
+  autoSave: true, singleClick: true, reopen: true, shell: '', spell: 'auto'};
 let settings = {...DEF}, recentProjects = [], booted = false;
 const effectiveLang = () => settings.lang === 'auto' ? ((navigator.language || 'en').toLowerCase().startsWith('de') ? 'de' : 'en') : settings.lang;
 function saveState() {
@@ -209,7 +209,7 @@ function makeGroup() {
   g.editor.onDidFocusEditorWidget(() => focusGroup(g));
   g.editor.onDidChangeCursorPosition(e => { if (g === focused) { updateStatus(); scheduleCrumbs(); } if (e.reason === 3 || e.source === 'api') return; });
   g.editor.onDidChangeCursorSelection(() => { if (g === focused) updateStatus(); });
-  g.editor.onDidChangeModelContent(() => { renderTabs(g); updateUI(); scheduleStructure(); });
+  g.editor.onDidChangeModelContent(() => { renderTabs(g); updateUI(); scheduleStructure(); scheduleSpell(g.editor.getModel()); });
   el.addEventListener('mousedown', () => focusGroup(g), true);
   fillEmptyHints(g);
   return g;
@@ -292,6 +292,7 @@ function setActive(g, path) {
   g.active = path;
   renderGroup(g);
   if (g === curGroup()) { updateUI(); buildStructure(); scheduleCrumbs(); }
+  const f = files.get(path); if (f && f.kind === 'text' && f.model) scheduleSpell(f.model, 150);
 }
 function renderGroup(g) {
   const f = files.get(g.active);
@@ -1480,7 +1481,8 @@ function renderSettings() {
        <div class="theme-name">${esc(t('theme.' + th))}<span>${settings.theme === th ? '&#10003;' : ''}</span></div></button>`).join('') + `</div>`,
     editor: `<h3>${t('set.font')}</h3><select class="num-in" data-sel="fontSize">${[11, 12, 13, 14, 15, 16, 18, 20, 22, 24].map(n => opt(n, n + ' px', settings.fontSize)).join('')}</select>
       <h3>${t('set.tabSize')}</h3><select class="num-in" data-sel="tabSize">${[2, 4, 8].map(n => opt(n, n, settings.tabSize)).join('')}</select>
-      <h3>${t('set.view')}</h3>${sw('wordWrap', t('a.wordWrap'))}${sw('minimap', t('a.minimap'))}${sw('whitespace', t('a.whitespace'))}${sw('sticky', t('set.sticky'))}${sw('ligatures', t('set.ligatures'))}`,
+      <h3>${t('set.view')}</h3>${sw('wordWrap', t('a.wordWrap'))}${sw('minimap', t('a.minimap'))}${sw('whitespace', t('a.whitespace'))}${sw('sticky', t('set.sticky'))}${sw('ligatures', t('set.ligatures'))}
+      <h3>${t('set.spell')}</h3><p class="hint">${t('set.spellHint')}</p><select class="wide-sel" data-sel="spell">${opt('auto', t('set.spellAuto'), settings.spell)}${opt('de', 'Deutsch', settings.spell)}${opt('en', 'English', settings.spell)}${opt('off', t('set.spellOff'), settings.spell)}</select>`,
     terminal: `<h3>${t('set.shell')}</h3><p class="hint">${t('set.shellHint')}</p><input class="field-in wide-sel" data-text="shell" value="${esc(settings.shell)}" spellcheck="false">`
   };
   $('#modalTitle').textContent = t('set.title');
@@ -1515,7 +1517,9 @@ function applyLanguage() {
   buildMenubar(); buildToolbars();
   if (booted) { renderRecent(); groups.forEach(fillEmptyHints); renderFind(); renderTodo(); buildStructure(); updateUI(); }
 }
+let lastSpell = null;
 function applySettings() {
+  if (settings.spell !== lastSpell) { const first = lastSpell === null; lastSpell = settings.spell; if (!first && window.monaco) spellRerun(); }
   if (!THEMES.includes(settings.theme)) settings.theme = 'dark';
   const nl = effectiveLang();
   if (nl !== lang) { lang = nl; applyLanguage(); }
@@ -1560,9 +1564,11 @@ if (window.Native) {
         item('newTerminal'), {id: 'term:close', label: t('ctx.closeTerminal')}];
     }
     if (e.target.closest('.group-ed .ed-host') && curEditor()) {
-      return [{id: 'ed:cut', label: t('ctx.cut'), accel: 'Ctrl+X'}, {id: 'ed:copy', label: t('ctx.copy'), accel: 'Ctrl+C'}, {id: 'ed:paste', label: t('ctx.paste'), accel: 'Ctrl+V'}, null,
+      const sp = spellMenu(e);
+      const base = [{id: 'ed:cut', label: t('ctx.cut'), accel: 'Ctrl+X'}, {id: 'ed:copy', label: t('ctx.copy'), accel: 'Ctrl+C'}, {id: 'ed:paste', label: t('ctx.paste'), accel: 'Ctrl+V'}, null,
         item('goToDefinition'), item('findUsages'), item('renameSymbol'), item('quickFix'), null, item('formatCode'), item('commentLine'), null,
         item('find'), item('findInFiles'), null, item('localHistory'), item('selectInProject'), item('copyPath')];
+      return sp ? sp.then(items => [...items, null, ...base]) : base;
     }
     const hit = e.target.closest('#findList .hit');
     if (hit) { ctx = {hit: findState.hits[+hit.dataset.hit]}; return [{id: 'hit:open', label: t('ctx.open')}, {id: 'hit:copy', label: t('ctx.copy')}]; }
@@ -1570,6 +1576,7 @@ if (window.Native) {
   });
   Native.setHandler(async id => {
     const [scope, what] = id.split(':');
+    if (scope === 'sp') return spellAction(what, id.split(':')[2]);
     if (scope === 'tab') {
       const {g, path} = ctx;
       if (what === 'close') return closeTab(g, path);
@@ -1625,6 +1632,128 @@ if (window.Native) {
   });
 }
 
+/* ================= Spelling & grammar ================= */
+/* Comments in code — and the whole text of Markdown and plain-text files — are checked in Rust (spell.rs, codespell.rs)
+   on this PC. Issues are squiggles (marker owner "spell"); fixes are in the context menu and in Quick Fix (Ctrl+.).
+   In code, words that also occur as identifiers in the same file count as known. */
+const PROSE_LANGS = new Set(['markdown', 'plaintext']);
+const spellIgnored = new Set();   // "kind:text" ignored for this session
+const spellTimers = new WeakMap(), spellIssues = new WeakMap();
+let spellCtx = null;
+function scheduleSpell(model, delay = 900) {
+  if (!model || !invoke) return;
+  clearTimeout(spellTimers.get(model));
+  spellTimers.set(model, setTimeout(() => runSpell(model), delay));
+}
+/* The parts of a file to check, as [start, end] offsets: comments, or prose outside code in Markdown. */
+function spellParts(model) {
+  const text = model.getValue(), lang = model.getLanguageId(), lines = text.split('\n'), parts = [];
+  let off = 0;
+  const add = (a, b) => { const last = parts[parts.length - 1]; if (last && last[1] === a) last[1] = b; else if (b > a) parts.push([a, b]); };
+  if (PROSE_LANGS.has(lang)) {
+    let fence = false;
+    for (const line of lines) {
+      if (lang === 'markdown' && /^\s*(```|~~~)/.test(line)) fence = !fence;
+      else if (!fence) {
+        let a = 0;
+        if (lang === 'markdown') for (const m of line.matchAll(/`[^`]*`/g)) { add(off + a, off + m.index); a = m.index + m[0].length; }
+        add(off + a, off + line.length);
+      }
+      off += line.length + 1;
+    }
+    return {parts, prose: true};
+  }
+  monaco.editor.tokenize(text, lang).forEach((toks, li) => {
+    const line = lines[li] || '';
+    toks.forEach((tk, k) => { if (/comment/.test(tk.type)) add(off + tk.offset, off + (k + 1 < toks.length ? toks[k + 1].offset : line.length)); });
+    off += line.length + 1;
+  });
+  return {parts, prose: false};
+}
+async function runSpell(model) {
+  if (model.isDisposed()) return;
+  const clear = () => { spellIssues.set(model, []); monaco.editor.setModelMarkers(model, 'spell', []); };
+  if (settings.spell === 'off' || model.getValueLength() > 300000) return clear();
+  const v = model.getVersionId(), text = model.getValue(), {parts, prose} = spellParts(model);
+  if (!parts.length) return clear();
+  let list = await invoke('code_spell', {text, parts, lang: settings.spell, fallback: lang}).catch(() => []);
+  if (model.isDisposed() || model.getVersionId() !== v) return;
+  let idents = null;
+  if (!prose) {
+    // Words of the code itself (everything outside the checked parts) are identifiers, not typos.
+    let code = '', at = 0;
+    for (const [a, b] of parts) { code += text.slice(at, a) + ' '; at = b; }
+    code += text.slice(at);
+    idents = new Set((code.match(/[\p{L}_][\p{L}\p{N}_]*/gu) || []).map(w => w.toLowerCase()));
+  }
+  list = list.filter(i => {
+    const w = text.slice(i.start, i.end);
+    return !spellIgnored.has(i.kind + ':' + w) && !(i.kind === 'spell' && idents && idents.has(w.toLowerCase()));
+  }).map(i => ({...i, word: text.slice(i.start, i.end), range: monaco.Range.fromPositions(model.getPositionAt(i.start), model.getPositionAt(i.end))}));
+  spellIssues.set(model, list);
+  monaco.editor.setModelMarkers(model, 'spell', list.map(i => ({
+    startLineNumber: i.range.startLineNumber, startColumn: i.range.startColumn, endLineNumber: i.range.endLineNumber, endColumn: i.range.endColumn,
+    severity: i.kind === 'spell' ? monaco.MarkerSeverity.Info : monaco.MarkerSeverity.Hint,
+    message: i.kind === 'spell' ? t('sp.unknown', {w: i.word}) : t('sp.rule.' + i.kind), source: t('sp.source')})));
+}
+const spellAt = (model, pos) => (spellIssues.get(model) || []).find(i => i.range.containsPosition(pos));
+/* Suggestions and actions for one issue: [{label, text}] replacements, plus the word for add / ignore. */
+async function spellChoices(i) {
+  if (i.kind !== 'spell') return i.fix.map(s => ({label: t('sp.fix.' + i.kind, {s}), text: s}));
+  const sug = await invoke('spell_suggest', {word: i.word, lang: settings.spell}).catch(() => []);
+  return sug.map(s => ({label: s, text: s}));
+}
+function spellRerun() { for (const m of monaco.editor.getModels()) scheduleSpell(m, 50); }
+function spellApply(model, i, text) {
+  if (model.isDisposed() || model.getValueInRange(i.range) !== i.word) return;
+  const ed = curEditor();
+  if (ed && ed.getModel() === model) { ed.pushUndoStop(); ed.executeEdits('spell', [{range: i.range, text}]); ed.pushUndoStop(); ed.focus(); }
+  else model.pushEditOperations([], [{range: i.range, text}], () => null);
+}
+function spellIgnore(i) {
+  spellIgnored.add(i.kind + ':' + i.word);
+  for (const m of monaco.editor.getModels()) {
+    const list = (spellIssues.get(m) || []).filter(x => !(x.kind === i.kind && x.word === i.word));
+    spellIssues.set(m, list);
+    monaco.editor.setModelMarkers(m, 'spell', monaco.editor.getModelMarkers({owner: 'spell', resource: m.uri}).filter(mk => !(m.getValueInRange(mk) === i.word)));
+  }
+}
+/* Context menu on an underlined word: suggestions first. */
+function spellMenu(e) {
+  const ed = curEditor(); if (!ed) return null;
+  const tg = ed.getTargetAtClientPoint(e.clientX, e.clientY), model = ed.getModel();
+  const i = tg && tg.position && spellAt(model, tg.position); if (!i) return null;
+  return spellChoices(i).then(ch => {
+    spellCtx = {model, i, ch};
+    const items = ch.length ? ch.map((c, k) => ({id: 'sp:fix:' + k, label: c.label})) : [{id: 'sp:none', label: t('sp.noSuggestions'), enabled: false}];
+    if (i.kind !== 'spell') items.unshift({id: 'sp:rule', label: t('sp.rule.' + i.kind), enabled: false});
+    return [...items, null, ...(i.kind === 'spell' ? [{id: 'sp:add', label: t('sp.add', {w: i.word})}] : []), {id: 'sp:ignore', label: t('sp.ignore')}];
+  });
+}
+async function spellAction(what, k) {
+  const c = spellCtx; if (!c) return;
+  if (what === 'fix') spellApply(c.model, c.i, c.ch[+k].text);
+  else if (what === 'add') { await invoke('spell_add', {word: c.i.word}).catch(() => {}); spellRerun(); }
+  else if (what === 'ignore') spellIgnore(c.i);
+}
+/* The same choices in Quick Fix (Ctrl+. / the light bulb). */
+function registerSpellActions() {
+  monaco.editor.registerCommand('codeStudio.spellAdd', async (_, w) => { await invoke('spell_add', {word: w}).catch(() => {}); spellRerun(); });
+  monaco.editor.registerCommand('codeStudio.spellIgnore', (_, kind, w) => spellIgnore({kind, word: w}));
+  monaco.languages.registerCodeActionProvider('*', {async provideCodeActions(model, range) {
+    const list = (spellIssues.get(model) || []).filter(i => monaco.Range.areIntersectingOrTouching(i.range, range));
+    const actions = [];
+    for (const i of list.slice(0, 3)) {
+      const marker = monaco.editor.getModelMarkers({owner: 'spell', resource: model.uri}).filter(m => m.startLineNumber === i.range.startLineNumber && m.startColumn === i.range.startColumn);
+      (await spellChoices(i)).slice(0, 6).forEach((c, k) => actions.push({title: c.label, kind: 'quickfix', isPreferred: k === 0, diagnostics: marker,
+        edit: {edits: [{resource: model.uri, versionId: model.getVersionId(), textEdit: {range: i.range, text: c.text}}]}}));
+      if (i.kind === 'spell') actions.push({title: t('sp.add', {w: i.word}), kind: 'quickfix', command: {id: 'codeStudio.spellAdd', title: '', arguments: [i.word]}});
+      actions.push({title: t('sp.ignore') + ' — ' + i.word, kind: 'quickfix', command: {id: 'codeStudio.spellIgnore', title: '', arguments: [i.kind, i.word]}});
+    }
+    return {actions, dispose() {}};
+  }});
+}
+
 /* ================= Boot ================= */
 (async function boot() {
   if (invoke) I18N = await invoke('texts');
@@ -1632,7 +1761,7 @@ if (window.Native) {
   applySettings();
   renderRecent(); renderFind(); renderTodo(); buildStructure();
   await monacoReady;
-  defineThemes();
+  defineThemes(); registerSpellActions();
   monaco.editor.setTheme('studio-' + settings.theme);
   booted = true;
   let start = invoke ? await invoke('initial_path').catch(() => null) : null, file = null;

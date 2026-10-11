@@ -1,8 +1,10 @@
 // Hide the console window in release builds on Windows.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod codespell;
 mod fuzzy;
 mod lsp;
+mod spell;
 mod symbols;
 mod terminal;
 
@@ -522,6 +524,11 @@ fn main() {
             symbols::symbols_of,
             fuzzy::fuzzy_files,
             fuzzy::fuzzy_rank,
+            codespell::code_spell,
+            spell::spell_check,
+            spell::spell_suggest,
+            spell::spell_add,
+            spell::spell_ready,
             list_dir,
             read_file,
             stat_files,
