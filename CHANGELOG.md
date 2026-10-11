@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.0 — 2026-10-11
+- Git (stage 3b), through the installed git: a Git panel (Alt+0) lists changed files — tick a file to stage it — with the commit message below (Ctrl+Enter or Ctrl+K commits; “Amend last commit”). Click a file for the differences since the last commit; right-click to stage/unstage, open or discard changes.
+- The status bar shows the branch with ↑ commits to push and ↓ to pull; click it to switch branches, create one, pull, push or fetch. Push (Ctrl+Shift+K) and pull (Ctrl+T) run in a bottom-panel tab, so prompts and messages are visible.
+- Changed lines get a colored mark next to the line numbers (added, changed, removed); changed files are colored in the project tree.
+
 ## 0.6.0 — 2026-10-11
 - Run configurations (stage 3a): the toolbar has a configuration list with ▶ Run (Shift+F10) and ■ Stop (Ctrl+F2). Code Studio finds what the project offers — cargo run/test/build (also in subfolders like src-tauri), npm/pnpm/yarn/bun scripts, go, python, make targets, dotnet — and you can add your own commands (Run → Edit Configurations…, saved with the project).
 - Run → Run Current File (Ctrl+Shift+F10) for Python, JavaScript/TypeScript, Go, Ruby, PHP, Perl, Lua, shell and PowerShell files.

@@ -3,6 +3,7 @@
 
 mod codespell;
 mod fuzzy;
+mod git;
 mod lsp;
 mod runconfig;
 mod spell;
@@ -527,6 +528,15 @@ fn main() {
             fuzzy::fuzzy_rank,
             codespell::code_spell,
             runconfig::run_configs,
+            git::git_status,
+            git::git_head_text,
+            git::git_line_changes,
+            git::git_stage,
+            git::git_unstage,
+            git::git_discard,
+            git::git_commit,
+            git::git_branches,
+            git::git_switch,
             spell::spell_check,
             spell::spell_suggest,
             spell::spell_add,

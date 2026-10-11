@@ -93,6 +93,16 @@ svg.i{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stro
 .dropdown .chk{font-size:11px}
 .dropdown hr{border:0;border-top:1px solid var(--dd-border);margin:4px 0}
 .dropdown .dd-label{padding:6px 16px 2px 26px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim)}
+.git-panel{display:none;flex-direction:column}.git-panel.active{display:flex}.git-panel .dp-scroll{flex:1}
+.git-row{display:flex;align-items:center;gap:6px;cursor:pointer}.git-row small{color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.git-row .git-chk{margin:0 2px 0 0}.git-code{font-size:11px;width:14px;text-align:center}
+.git-M,.nm.git-M{color:#5a9cf0}.git-A,.nm.git-A,.git-U,.nm.git-U{color:#59a869}.git-D,.nm.git-D{color:#d7373f;text-decoration:line-through}.git-R,.nm.git-R{color:#b073e0}
+.git-commit{border-top:1px solid var(--line);padding:8px;display:flex;flex-direction:column;gap:6px}.git-commit textarea{resize:vertical;min-height:54px;font:inherit}
+.git-commit-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.git-commit-row label{display:flex;align-items:center;gap:4px;color:var(--dim);flex-basis:100%;white-space:nowrap}.git-commit-row .btn-sm{white-space:nowrap}
+.st-branch{font-weight:600}
+.git-gutter{width:3px!important;margin-left:4px}.git-added{background:#59a869}.git-modified{background:#3d8ee8}
+.git-deleted{border-bottom:3px solid #d7373f;height:0!important;width:8px!important;margin-top:-1px}
+.modal.gitdiff{width:min(1200px,96vw);height:min(760px,90vh)}.modal.gitdiff .modal-body{padding:0;overflow:hidden}.git-diff-host{width:100%;height:100%;min-height:60vh}
 .run-box{gap:4px}.run-sel{max-width:220px;height:26px;background:var(--input-bg,var(--chrome2));color:var(--text);border:1px solid var(--border);border-radius:4px;padding:0 6px;font:inherit}
 .run-box #runBtns{display:flex;gap:1px}
 .rc-row{display:grid;grid-template-columns:1fr 2fr 1fr auto;gap:6px;margin-bottom:6px}
@@ -412,10 +422,20 @@ select:focus,input:focus{border-color:var(--accent)}
       <button data-tab="project" data-i18n="ui.project"></button>
       <button data-tab="structure" data-i18n="ui.structure"></button>
       <button data-tab="todo" data-i18n="ui.todo"></button>
+      <button data-tab="git" data-i18n="git.tab"></button>
     </div>
     <div class="dock-body">
       <div class="dpanel" data-panel="project"><div class="dp-head" id="treeHead"></div><div class="dp-scroll"><div class="tree" id="tree" tabindex="0"></div></div></div>
       <div class="dpanel" data-panel="structure"><div class="dp-head"><input class="field-in" id="symFilter" data-i18n-ph="ui.filterSymbols" spellcheck="false"></div><div class="dp-scroll list" id="symList"></div></div>
+      <div class="dpanel git-panel" data-panel="git">
+        <div class="dp-scroll" id="gitList"></div>
+        <div class="git-commit" id="gitCommitBox" hidden>
+          <textarea id="gitMsg" class="field-in" rows="3" data-i18n-ph="git.msgPh" spellcheck="true"></textarea>
+          <div class="git-commit-row"><label><input type="checkbox" id="gitAmend"> <span data-i18n="git.amend"></span></label><span class="flex"></span>
+            <button class="btn-sm" data-act="gitPull" data-i18n="git.pull"></button><button class="btn-sm" data-act="gitPush" data-i18n="git.push"></button>
+            <button class="btn-sm primary" id="gitCommitBtn"></button></div>
+        </div>
+      </div>
       <div class="dpanel" data-panel="todo"><div class="dp-head" id="todoHead"></div><div class="dp-scroll" id="todoList"></div></div>
     </div>
   </aside>
@@ -423,6 +443,7 @@ select:focus,input:focus{border-color:var(--accent)}
 
 <footer class="status" id="status">
   <span id="stState" class="st-state"></span>
+  <button id="stBranch" class="st-branch" hidden data-i18n-title="git.branchTip"></button>
   <div class="crumbs" id="crumbs"></div>
   <span class="flex"></span>
   <button id="stProblems" hidden></button>

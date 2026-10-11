@@ -136,7 +136,7 @@ async function openProject(root, opts = {}) {
   await monacoReady;
   ensureGroups(sess && sess.split ? 2 : 1);
   await refreshTree();
-  loadRunConfigs();
+  loadRunConfigs(); refreshGit();
   if (sess && !opts.fresh) {
     for (let gi = 0; gi < groups.length; gi++) {
       for (const p of (sess.tabs && sess.tabs[gi]) || []) await openFile(p, {group: gi, focus: false, quiet: true, noRecent: true});
@@ -211,7 +211,7 @@ function makeGroup() {
   g.editor.onDidFocusEditorWidget(() => focusGroup(g));
   g.editor.onDidChangeCursorPosition(e => { if (g === focused) { updateStatus(); scheduleCrumbs(); } if (e.reason === 3 || e.source === 'api') return; });
   g.editor.onDidChangeCursorSelection(() => { if (g === focused) updateStatus(); });
-  g.editor.onDidChangeModelContent(() => { renderTabs(g); updateUI(); scheduleStructure(); scheduleSpell(g.editor.getModel()); });
+  g.editor.onDidChangeModelContent(() => { renderTabs(g); updateUI(); scheduleStructure(); scheduleSpell(g.editor.getModel()); scheduleGutter(files.get(g.active)); });
   el.addEventListener('mousedown', () => focusGroup(g), true);
   fillEmptyHints(g);
   return g;
@@ -294,7 +294,7 @@ function setActive(g, path) {
   g.active = path;
   renderGroup(g);
   if (g === curGroup()) { updateUI(); buildStructure(); scheduleCrumbs(); }
-  const f = files.get(path); if (f && f.kind === 'text' && f.model) scheduleSpell(f.model, 150);
+  const f = files.get(path); if (f && f.kind === 'text' && f.model) { scheduleSpell(f.model, 150); scheduleGutter(f, 150); }
 }
 function renderGroup(g) {
   const f = files.get(g.active);
@@ -347,7 +347,7 @@ async function saveFile(f) {
     const text = (f.bom ? '﻿' : '') + f.model.getValue();
     f.mtime = await writeText(f.path, text);
     f.saved = id;
-    LSP.saved(f.path);
+    LSP.saved(f.path); scheduleGit(600);
     return true;
   } catch (e) { toast(t('toast.saveFail', {e})); return false; }
 }
@@ -386,7 +386,7 @@ async function checkDisk() {
   await refreshTree(true);
 }
 window.addEventListener('blur', () => { if (settings.autoSave && project) saveAll(true); });
-window.addEventListener('focus', () => { checkDisk(); });
+window.addEventListener('focus', () => { checkDisk(); scheduleGit(200); });
 if (invoke) {
   const win = window.__TAURI__.window.getCurrentWindow();
   let closing = false;
@@ -452,7 +452,7 @@ function renderTree() {
   if (tree.expanded.has(project.root)) walk(project.root, 1);
   tree.rows = rows;
   box.innerHTML = rows.map((r, i) => `<div class="row${r.root ? ' root' : ''}${r.path === tree.sel ? ' sel' : ''}" data-i="${i}" style="padding-left:${6 + r.depth * 16}px">
-    <span class="tw">${r.dir ? (tree.expanded.has(r.path) ? '&#9660;' : '&#9654;') : ''}</span>${fileIcon(r.path, r.dir)}<span class="nm">${esc(r.name)}</span>${r.root ? `<span class="hint">${esc(r.path)}</span>` : ''}</div>`).join('');
+    <span class="tw">${r.dir ? (tree.expanded.has(r.path) ? '&#9660;' : '&#9654;') : ''}</span>${fileIcon(r.path, r.dir)}<span class="nm${!r.dir && gitStateOf(r.path) ? ' git-' + gitStateOf(r.path) : ''}">${esc(r.name)}</span>${r.root ? `<span class="hint">${esc(r.path)}</span>` : ''}</div>`).join('');
 }
 async function toggleDir(path, open) {
   const isOpen = tree.expanded.has(path);
@@ -993,6 +993,7 @@ if (invoke) {
     const tm = terms.find(x => x.id === ev.payload.id); if (!tm || !tm.run) return;
     const c = ev.payload.code;
     tm.code = c;
+    if (tm.run.key.startsWith('git:')) scheduleGit(100);
     tm.xterm.writeln(`\r\n\x1b[${c === 0 ? 32 : 31}m[${t('run.exited', {c: c == null ? '?' : c})}]\x1b[0m`);
   });
 }
@@ -1034,6 +1035,128 @@ $('#bottomTabs').addEventListener('click', e => {
   const tb = e.target.closest('[data-term]'); if (tb) { activeTerm = terms.find(x => x.n === +tb.dataset.term); settings.bottomTab = 'terminal'; showBottom(); renderBottomTabs(); return; }
   const b = e.target.closest('[data-bt]'); if (b) showBottom(b.dataset.bt);
 });
+
+/* ================= Git ================= */
+/* Through the installed git (Rust: git.rs). The Git panel lists changed files — a checkmark stages a file — with the
+   commit message below; the status bar shows the branch (click: switch / new / push / pull); changed lines get a mark
+   next to the line numbers, changed files a color in the project tree. Push and pull run in a bottom-panel tab. */
+let git = {repo: false, top: '', branch: '', ahead: 0, behind: 0, files: []}, gitT = 0, gitBusy = false;
+const gitAbs = rel => join(git.top, rel);
+const gitStaged = f => f.x !== ' ' && f.x !== '?';
+const gitChanged = f => f.y !== ' ';
+const gitCode = f => f.x === '?' ? 'U' : (gitChanged(f) ? f.y : f.x);   // the letter shown
+function scheduleGit(delay = 400) { clearTimeout(gitT); gitT = setTimeout(refreshGit, delay); }
+async function refreshGit() {
+  if (!project || !invoke) { git = {repo: false, files: []}; return renderGit(); }
+  const s = await invoke('git_status', {root: project.root}).catch(e => ({repo: false, error: String(e)}));
+  git = {...s, files: s.files || []};
+  renderGit(); renderTree();
+  const f = curFile(); if (f && f.kind === 'text' && f.model) scheduleGutter(f, 50);
+}
+const gitStateOf = path => { if (!git.repo) return null; const f = git.files.find(x => gitAbs(x.path) === path); return f ? gitCode(f) : null; };
+function renderGit() {
+  const st = $('#stBranch');
+  st.hidden = !git.repo;
+  if (git.repo) st.textContent = '⎇ ' + (git.branch || '?') + (git.ahead ? ' ↑' + git.ahead : '') + (git.behind ? ' ↓' + git.behind : '');
+  const box = $('#gitList'); if (!box) return;
+  if (!project) { box.innerHTML = ''; return; }
+  if (!git.repo) { box.innerHTML = `<div class="empty">${esc(git.error && /not installed/.test(git.error) ? t('git.noGit') : t('git.noRepo'))}</div>`; $('#gitCommitBox').hidden = true; return; }
+  $('#gitCommitBox').hidden = false;
+  const row = (f, staged) => {
+    const p = gitAbs(f.path), code = staged ? f.x : (f.x === '?' ? 'U' : f.y);
+    return `<div class="row git-row" data-path="${esc(p)}" data-staged="${staged ? 1 : 0}" title="${esc(f.path)}">
+      <input type="checkbox" class="git-chk"${staged ? ' checked' : ''} title="${esc(t(staged ? 'git.unstage' : 'git.stage'))}">${fileIcon(p)}
+      <span class="nm git-${code}">${esc(baseName(f.path))}</span><small>${esc(dirName(f.path))}</small><b class="git-code git-${code}">${esc(code)}</b></div>`;
+  };
+  const staged = git.files.filter(gitStaged), changed = git.files.filter(f => gitChanged(f) || f.x === '?');
+  box.innerHTML = (staged.length ? `<div class="file-group">${esc(t('git.staged'))} · ${staged.length}</div>` + staged.map(f => row(f, true)).join('') : '') +
+    (changed.length ? `<div class="file-group">${esc(t('git.changes'))} · ${changed.length}</div>` + changed.map(f => row(f, false)).join('') : '') +
+    (!staged.length && !changed.length ? `<div class="empty">${esc(t('git.clean'))}</div>` : '');
+  $('#gitCommitBtn').disabled = !staged.length && !$('#gitAmend').checked;
+  $('#gitCommitBtn').textContent = staged.length ? t('git.commitN', {n: staged.length}) : t('git.commit');
+}
+async function gitDo(cmd, args, okMsg) {
+  if (gitBusy) return; gitBusy = true;
+  try { const r = await invoke(cmd, {root: project.root, ...args}); if (okMsg) toast(okMsg(r)); return true; }
+  catch (e) { toast(t('git.fail', {e})); return false; }
+  finally { gitBusy = false; await refreshGit(); }
+}
+async function gitCommit() {
+  if (!git.repo) return toast(t('git.noRepo'));
+  showDockTab('git');
+  const msg = $('#gitMsg').value.trim(), amend = $('#gitAmend').checked;
+  if (!msg) { $('#gitMsg').focus(); return toast(t('git.needMsg')); }
+  if (!git.files.some(gitStaged) && !amend) return toast(t('git.nothingStaged'));
+  if (dirtyFiles().length) await saveAll(true);
+  if (await gitDo('git_commit', {message: msg, amend}, r => t('git.committed', {s: r}))) { $('#gitMsg').value = ''; $('#gitAmend').checked = false; }
+}
+/* Push / pull / fetch run like a run configuration, so prompts and messages are visible. */
+const gitRun = (name, command) => { if (!git.repo) return toast(t('git.noRepo')); runConfig({name, command, cwd: git.top, key: 'git:' + name}); };
+async function showDiff(path) {
+  const base = await invoke('git_head_text', {path}).catch(() => null);
+  const open = files.get(path), cur = open && open.model ? open.model.getValue() : await readText(path).catch(() => '');
+  modal(t('git.diffTitle', {f: baseName(path)}), '<div id="gitDiffHost" class="git-diff-host"></div>', null, 'gitdiff');
+  const lang = langFor(path), orig = monaco.editor.createModel(base == null ? '' : base, lang), mod = monaco.editor.createModel(cur, lang);
+  const de = monaco.editor.createDiffEditor($('#gitDiffHost'), {...editorOptions(), readOnly: true, originalEditable: false, renderSideBySide: true, minimap: {enabled: false}, automaticLayout: true});
+  de.setModel({original: orig, modified: mod});
+  modalOnClose = () => { de.dispose(); orig.dispose(); mod.dispose(); };
+}
+const readText = async p => new TextDecoder().decode(await readBytes(p));
+/* Gutter: lines changed since the last commit. */
+const gutterTimers = new WeakMap();
+function scheduleGutter(f, delay = 700) {
+  if (!f || !f.model || !invoke) return;
+  clearTimeout(gutterTimers.get(f)); gutterTimers.set(f, setTimeout(() => updateGutter(f), delay));
+}
+async function updateGutter(f) {
+  if (!f.model || f.model.isDisposed()) return;
+  const v = f.model.getVersionId();
+  const list = git.repo ? await invoke('git_line_changes', {path: f.path, text: f.model.getValue()}).catch(() => null) : null;
+  if (f.model.isDisposed() || f.model.getVersionId() !== v) return;
+  const deco = (list || []).map(([a, b, kind]) => ({range: new monaco.Range(Math.max(1, a), 1, Math.max(1, b), 1),
+    options: {isWholeLine: true, linesDecorationsClassName: 'git-gutter git-' + kind, overviewRuler: {color: kind === 'added' ? '#59a869' : kind === 'modified' ? '#3d8ee8' : '#d7373f', position: 1}}}));
+  f.gitDeco = f.model.deltaDecorations(f.gitDeco || [], deco);
+}
+async function gitBranchMenu() {
+  if (!git.repo) return;
+  const b = await invoke('git_branches', {root: project.root}).catch(() => null); if (!b) return;
+  ctx = {branches: b.local};
+  return [...b.local.slice(0, 25).map((n, i) => ({id: 'git:switch:' + i, label: n, checked: n === b.current})), null,
+    {id: 'git:newBranch', label: t('git.newBranch')}, null,
+    {id: 'git:pull', label: t('a.gitPull'), accel: keyOf('gitPull')}, {id: 'git:push', label: t('a.gitPush'), accel: keyOf('gitPush')}, {id: 'git:fetch', label: t('git.fetch')}];
+}
+$('#stBranch').addEventListener('click', async () => { const items = await gitBranchMenu(); if (items) invoke('context_menu', {items: items.map(i => i ? {id: i.id, label: i.label, enabled: i.enabled !== false, checked: i.checked, accel: i.accel || null} : {})}); });
+async function gitHandle(what, arg) {
+  if (what === 'switch') {
+    if (dirtyFiles().length) await saveAll(true);
+    if (await gitDo('git_switch', {branch: ctx.branches[+arg], create: false}, () => t('git.switched', {b: ctx.branches[+arg]}))) await reloadOpenFiles();
+  } else if (what === 'newBranch') {
+    const name = await promptText(t('git.newBranch'), t('git.branchName'), '');
+    if (name && name.trim()) await gitDo('git_switch', {branch: name.trim(), create: true}, () => t('git.switched', {b: name.trim()}));
+  } else if (what === 'push') gitRun('git push', 'git push');
+  else if (what === 'pull') gitRun('git pull', 'git pull');
+  else if (what === 'fetch') gitRun('git fetch', 'git fetch --prune');
+  else if (what === 'open') openFile(ctx.path);
+  else if (what === 'diff') showDiff(ctx.path);
+  else if (what === 'stage') gitDo('git_stage', {paths: [ctx.path]});
+  else if (what === 'unstage') gitDo('git_unstage', {paths: [ctx.path]});
+  else if (what === 'discard') {
+    if (!(await ask(t('git.discardAsk', {f: baseName(ctx.path)}), t('git.discard')))) return;
+    if (await gitDo('git_discard', {paths: [ctx.path]})) await reloadOpenFiles();
+  }
+}
+/* After a branch switch or discard, open files show what is on disk now. */
+async function reloadOpenFiles() { await checkDisk(); }
+$('#gitList').addEventListener('click', e => {
+  const r = e.target.closest('.git-row'); if (!r) return;
+  if (e.target.classList.contains('git-chk')) return gitDo(e.target.checked ? 'git_stage' : 'git_unstage', {paths: [r.dataset.path]});
+  showDiff(r.dataset.path);
+});
+$('#gitList').addEventListener('dblclick', e => { const r = e.target.closest('.git-row'); if (r) openFile(r.dataset.path); });
+$('#gitMsg').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); gitCommit(); } });
+$('#gitAmend').addEventListener('change', renderGit);
+$('#gitCommitBtn').addEventListener('click', gitCommit);
+function showDockTab(tab) { settings.dock = true; settings.dockTab = tab; applyLayout(); }
 
 /* ================= Run configurations ================= */
 /* What the project's build files offer (Rust: runconfig.rs), the user's own commands (kept with the project's session)
@@ -1313,7 +1436,7 @@ const edCmd = (id, args) => () => { const ed = curEditor(); if (!ed) return; ed.
 const togglePanel = tab => () => {
   if (settings.dock && settings.dockTab === tab) settings.dock = false; else { settings.dock = true; settings.dockTab = tab; }
   applyLayout();
-  if (settings.dock) { if (tab === 'project') $('#tree').focus(); if (tab === 'structure') { buildStructure(); $('#symFilter').focus(); } if (tab === 'todo') refreshTodo(); }
+  if (settings.dock) { if (tab === 'project') $('#tree').focus(); if (tab === 'structure') { buildStructure(); $('#symFilter').focus(); } if (tab === 'todo') refreshTodo(); if (tab === 'git') refreshGit(); }
   else { const ed = curEditor(); if (ed) ed.focus(); }
 };
 const toggleBottomTab = tab => () => { if (settings.bottom && settings.bottomTab === tab) { settings.bottom = false; applyLayout(); const ed = curEditor(); if (ed) ed.focus(); } else showBottom(tab); };
@@ -1324,6 +1447,9 @@ const DEF_LANGS = ['typescript', 'javascript', 'css', 'scss', 'less', 'json', 'h
 /* Declarations, usages and rename need a language server (or Monaco's own TypeScript/CSS/HTML support). */
 const smart = ed => DEF_LANGS.includes(ed.getModel().getLanguageId()) || LSP.hasClient(ed.getModel().getLanguageId());
 const A = {
+  gitCommit: () => gitCommit(), gitPush: () => gitHandle('push'), gitPull: () => gitHandle('pull'), gitPanel: togglePanel('git'),
+  gitBranches: async () => { const items = await gitBranchMenu(); if (items) invoke('context_menu', {items: items.map(i => i ? {id: i.id, label: i.label, enabled: i.enabled !== false, checked: i.checked, accel: i.accel || null} : {})}); },
+  gitRefresh: () => refreshGit(),
   run: () => runSelected(), runFile: () => runCurrentFile(), stopRun: () => stopRun(), editRunConfigs: () => editRunConfigs(),
   toggleAutoHide: () => { settings.autoHide = !settings.autoHide; applySettings(); },
   newProject, openFolder: async () => { const p = await invoke('pick_folder'); if (p) openProject(p); }, closeProject: () => closeProject(false),
@@ -1403,6 +1529,7 @@ const MENUS = [
     ['goToDefinition', 'Ctrl+B'], ['goToImplementation', 'Ctrl+Alt+B'], ['findUsages', 'Alt+F7'], ['selectInProject', 'Alt+F1'], '-', ['nextTab', 'Alt+ArrowRight'], ['prevTab', 'Alt+ArrowLeft']]],
   ['code', [['quickFix', 'Alt+Enter'], ['quickDoc', 'Ctrl+Q'], ['parameterInfo', 'Ctrl+P'], '-', ['formatCode', 'Ctrl+Alt+L'], ['commentLine', 'Ctrl+/'], ['blockComment', 'Ctrl+Shift+/', null, false, ['Ctrl+?']], '-', ['renameSymbol', 'Shift+F6'], '-',
     ['fold', 'Ctrl+-'], ['unfold', 'Ctrl+=', null, false, ['Ctrl++']], ['foldAll', 'Ctrl+Shift+-', null, false, ['Ctrl+_']], ['unfoldAll', 'Ctrl+Shift+=']]],
+  ['git', [['gitCommit', 'Ctrl+K'], ['gitPush', 'Ctrl+Shift+K'], ['gitPull', 'Ctrl+T'], '-', ['gitBranches'], ['gitPanel', 'Alt+0'], ['gitRefresh']]],
   ['run', [['run', 'Shift+F10'], ['runFile', 'Ctrl+Shift+F10'], ['stopRun', 'Ctrl+F2'], '-', ['editRunConfigs']]],
   ['settings', [['settings', 'Ctrl+Alt+S'], '-', '#menu.language',
     ['langAuto', null, () => settings.lang === 'auto'], ['langEn', null, () => settings.lang === 'en'], ['langDe', null, () => settings.lang === 'de'],
@@ -1489,7 +1616,7 @@ function buildToolbars() {
 }
 document.addEventListener('mousedown', e => { if (e.target.closest('.ibtn,.cta,#layoutSeg button,.search-btn')) e.preventDefault(); });
 document.addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (b && !b.disabled && !b.closest('.dropdown')) runAct(b.dataset.act); });
-$$('#dockTabs button').forEach(b => b.onclick = () => { settings.dock = true; settings.dockTab = b.dataset.tab; applyLayout(); if (b.dataset.tab === 'structure') buildStructure(); if (b.dataset.tab === 'todo') refreshTodo(); });
+$$('#dockTabs button').forEach(b => b.onclick = () => { settings.dock = true; settings.dockTab = b.dataset.tab; applyLayout(); if (b.dataset.tab === 'structure') buildStructure(); if (b.dataset.tab === 'todo') refreshTodo(); if (b.dataset.tab === 'git') refreshGit(); });
 
 /* Shortcut text for a key event: Ctrl+Alt+Shift+Key. For punctuation, Shift is part of the character, so the same
    shortcut works on US and German keyboards (Ctrl+/ is Ctrl+Shift+7 on a German keyboard). */
@@ -1718,12 +1845,20 @@ if (window.Native) {
         item('find'), item('findInFiles'), null, item('localHistory'), item('selectInProject'), item('copyPath')];
       return sp ? sp.then(items => [...items, null, ...base]) : base;
     }
+    const gr = e.target.closest('.git-row');
+    if (gr) {
+      ctx = {path: gr.dataset.path}; const f = git.files.find(x => gitAbs(x.path) === gr.dataset.path), staged = gr.dataset.staged === '1';
+      return [{id: 'git:diff', label: t('git.showDiff')}, {id: 'git:open', label: t('ctx.open')}, null,
+        staged ? {id: 'git:unstage', label: t('git.unstage')} : {id: 'git:stage', label: t('git.stage')},
+        ...(f && f.x !== '?' && !staged ? [{id: 'git:discard', label: t('git.discard') + '…'}] : [])];
+    }
     const hit = e.target.closest('#findList .hit');
     if (hit) { ctx = {hit: findState.hits[+hit.dataset.hit]}; return [{id: 'hit:open', label: t('ctx.open')}, {id: 'hit:copy', label: t('ctx.copy')}]; }
     return null;
   });
   Native.setHandler(async id => {
     const [scope, what] = id.split(':');
+    if (scope === 'git') return gitHandle(what, id.split(':')[2]);
     if (scope === 'sp') return spellAction(what, id.split(':')[2]);
     if (scope === 'tab') {
       const {g, path} = ctx;
