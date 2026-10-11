@@ -28,7 +28,7 @@ const fmtKey = k => {
 /* ================= Settings & state ================= */
 const STORE = 'code-studio';
 const THEMES = ['dark', 'light', 'github', 'github-dark'];
-const DEF = {autoHide: false, lang: 'auto', theme: 'dark', dock: true, dockTab: 'project', dockW: 320, bottom: false, bottomTab: 'terminal', bottomH: 260,
+const DEF = {keys: {}, autoHide: false, lang: 'auto', theme: 'dark', dock: true, dockTab: 'project', dockW: 320, bottom: false, bottomTab: 'terminal', bottomH: 260,
   fontSize: 14, tabSize: 4, wordWrap: false, minimap: true, whitespace: false, sticky: true, ligatures: true,
   autoSave: true, singleClick: true, reopen: true, shell: '', spell: 'auto'};
 let settings = {...DEF}, recentProjects = [], booted = false;
@@ -1287,7 +1287,12 @@ const MENUS = [
   ['help', [['shortcuts'], '-', ['about']]]
 ];
 const KEYMAP = {};
-MENUS.forEach(([, items]) => items.forEach(it => { if (!Array.isArray(it)) return; if (it[1] && !it[3]) KEYMAP[it[1]] = it[0]; (it[4] || []).forEach(k => KEYMAP[k] = it[0]); }));
+/* Built from the menu entries — again whenever a shortcut is changed in Settings (shortcuts.js). */
+function buildKeymap() {
+  for (const m of [KEYMAP]) for (const k in m) delete m[k];
+  MENUS.forEach(([, items]) => items.forEach(it => { if (!Array.isArray(it)) return; if (it[1] && !it[3]) KEYMAP[it[1]] = it[0]; (it[4] || []).forEach(k => KEYMAP[k] = it[0]); }));
+}
+buildKeymap();
 const NEEDS_EDITOR = new Set(['undo', 'redo', 'duplicateLine', 'deleteLine', 'moveLineUp', 'moveLineDown', 'expandSelection', 'shrinkSelection', 'addNextOccurrence',
   'selectAllOccurrences', 'find', 'replace', 'goToLine', 'goToDefinition', 'goToImplementation', 'findUsages', 'quickFix', 'quickDoc', 'parameterInfo', 'formatCode', 'commentLine', 'blockComment', 'fold', 'unfold', 'foldAll', 'unfoldAll', 'localHistory']);
 const NO_PROJECT = new Set(['toggleAutoHide', 'newProject', 'openFolder', 'settings', 'langAuto', 'langEn', 'langDe', 'themeDark', 'themeLight', 'themeGithub', 'themeGithubDark',
@@ -1377,6 +1382,7 @@ const inTerminal = () => { const a = document.activeElement; return !!(a && a.cl
 const FIELD_OK = new Set(['searchEverywhere', 'goToFile', 'findInFiles', 'replaceInFiles', 'settings', 'toggleTerminal', 'toggleProject', 'recentFiles', 'saveAll', 'goToSymbol', 'findAction']);
 let shiftAt = 0, shiftClean = true;
 window.addEventListener('keydown', e => {
+  if (window.Shortcuts && Shortcuts.recording) return;   // Settings → Shortcuts is taking a key
   if (e.key !== 'Shift') { shiftClean = false; shiftAt = 0; }
   if (e.key === 'Escape') {
     if ($('#modal').classList.contains('show')) { e.preventDefault(); closeModal(); }
@@ -1474,6 +1480,7 @@ function renderSettings() {
     <div class="tc-code"><i style="width:60%;background:#c678dd"></i><i style="width:80%;background:var(--dim)"></i><i style="width:45%;background:#e5a54b"></i><i style="width:70%;background:#56b6c2"></i><i style="width:30%;background:var(--dim)"></i></div>
     <div class="tc-tree"><i></i><i></i><i style="width:70%"></i><i></i><i style="width:60%"></i></div></div></div>`;
   const body = {
+    keys: `<div id="keysBox"></div>`,
     general: `<h3>${t('set.language')}</h3><p class="hint">${t('set.languageHint')}</p>
       <select class="wide-sel" data-sel="lang">${opt('auto', t('a.langAuto'), settings.lang)}${opt('en', 'English', settings.lang)}${opt('de', 'Deutsch', settings.lang)}</select>
       <h3>${t('set.startup')}</h3>${sw('reopen', t('set.reopen'))}${sw('autoSave', t('set.autoSave'))}${sw('singleClick', t('set.singleClick'))}
@@ -1488,8 +1495,9 @@ function renderSettings() {
     terminal: `<h3>${t('set.shell')}</h3><p class="hint">${t('set.shellHint')}</p><input class="field-in wide-sel" data-text="shell" value="${esc(settings.shell)}" spellcheck="false">`
   };
   $('#modalTitle').textContent = t('set.title');
-  $('#modalBody').innerHTML = `<div class="prefs"><nav>${Object.keys(body).map(k =>
+  $('#modalBody').innerHTML = `<div class="prefs"><nav>${Object.keys(body).filter(k => k !== 'keys').concat('keys').map(k =>
     `<button data-sec="${k}" class="${k === prefsSection ? 'active' : ''}">${esc(t('set.' + k))}</button>`).join('')}</nav><section>${body[prefsSection]}</section></div>`;
+  if (prefsSection === 'keys') mountKeys();
   $('#modalFoot').hidden = false;
   $('#modalFoot').innerHTML = `<button class="btn-sm" data-pref="reset">${esc(t('set.reset'))}</button><span class="flex"></span>
     <button class="btn-sm primary" data-pref="done">${esc(t('set.done'))}</button>`;
@@ -1520,8 +1528,19 @@ function applyLanguage() {
   if (booted) { renderRecent(); groups.forEach(fillEmptyHints); renderFind(); renderTodo(); buildStructure(); updateUI(); }
 }
 let lastSpell = null;
+let appliedKeys = '{}';
+/* Settings → Shortcuts: change a key by pressing it (shortcuts.js). */
+function mountKeys() {
+  Shortcuts.editor($('#keysBox'), {MENUS, keys: settings.keys || {}, t, fmtKey, comboOf, label: a => t('a.' + a),
+    onChange: keys => { settings.keys = keys; applySettings(); }});
+}
 function applySettings() {
   if (window.AutoHide) AutoHide.set(settings.autoHide);
+  if (window.Shortcuts && JSON.stringify(settings.keys || {}) !== appliedKeys) {
+    appliedKeys = JSON.stringify(settings.keys || {});
+    Shortcuts.apply(MENUS, settings.keys || {}); buildKeymap();
+    if (typeof buildToolbars === 'function' && document.querySelector('#menus')) buildToolbars();
+  }
   if (settings.spell !== lastSpell) { const first = lastSpell === null; lastSpell = settings.spell; if (!first && window.monaco) spellRerun(); }
   if (!THEMES.includes(settings.theme)) settings.theme = 'dark';
   const nl = effectiveLang();
