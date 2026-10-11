@@ -1,5 +1,7 @@
 //! Built-in terminal: a real shell in a pseudo console (ConPTY on Windows, a pty on macOS/Linux).
-//! Output reaches the UI as "term-data" events ({id, data}); "term-exit" ({id}) when the shell ends.
+//! Output reaches the UI as "term-data" events ({id, data}); "term-exit" ({id}) when the shell ends, and
+//! "term-code" ({id, code}) with its exit code. With `run`, a single command line runs instead of an interactive shell
+//! (run configurations); it goes through cmd on Windows and sh elsewhere, so pipes and && work.
 
 use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
 use serde::Serialize;
@@ -43,17 +45,49 @@ fn default_shell() -> String {
     }
 }
 
+#[derive(Serialize, Clone)]
+struct Code {
+    id: u32,
+    code: Option<u32>,
+}
+
+/// The command for a run: the command line given to the system shell.
+fn run_command(line: &str) -> CommandBuilder {
+    #[cfg(windows)]
+    {
+        // The line goes through a variable: quoting it as an argument would turn its quotes into \" (which cmd
+        // doesn't read). cmd expands %STUDIO_RUN% before it parses the line, so quotes, && and | work as typed.
+        let mut c = CommandBuilder::new("cmd.exe");
+        c.args(["/d", "/c", "%STUDIO_RUN%"]);
+        c.env("STUDIO_RUN", line);
+        c
+    }
+    #[cfg(not(windows))]
+    {
+        let mut c = CommandBuilder::new("/bin/sh");
+        c.args(["-c", line]);
+        c
+    }
+}
+
 #[tauri::command]
-pub fn term_start(app: AppHandle, state: State<Terminals>, cwd: String, cols: u16, rows: u16, shell: Option<String>) -> Result<u32, String> {
+#[allow(clippy::too_many_arguments)]
+pub fn term_start(app: AppHandle, state: State<Terminals>, cwd: String, cols: u16, rows: u16, shell: Option<String>, run: Option<String>) -> Result<u32, String> {
     let pair = native_pty_system()
         .openpty(PtySize { rows: rows.max(2), cols: cols.max(10), pixel_width: 0, pixel_height: 0 })
         .map_err(|e| e.to_string())?;
     let shell = shell.filter(|s| !s.trim().is_empty()).unwrap_or_else(default_shell);
-    let mut parts = shell.split_whitespace();
-    let mut cmd = CommandBuilder::new(parts.next().unwrap_or("sh"));
-    for a in parts {
-        cmd.arg(a);
-    }
+    let mut cmd = match run.as_deref().filter(|r| !r.trim().is_empty()) {
+        Some(line) => run_command(line),
+        None => {
+            let mut parts = shell.split_whitespace();
+            let mut c = CommandBuilder::new(parts.next().unwrap_or("sh"));
+            for a in parts {
+                c.arg(a);
+            }
+            c
+        }
+    };
     if std::path::Path::new(&cwd).is_dir() {
         cmd.cwd(&cwd);
     }
@@ -70,6 +104,7 @@ pub fn term_start(app: AppHandle, state: State<Terminals>, cwd: String, cols: u1
         *n
     };
     state.map.lock().unwrap().insert(id, Term { master: pair.master, writer, child });
+    let app2 = app.clone();
 
     std::thread::spawn(move || {
         let mut buf = [0u8; 16384];
@@ -94,6 +129,27 @@ pub fn term_start(app: AppHandle, state: State<Terminals>, cwd: String, cols: u1
             }
         }
         let _ = app.emit("term-exit", id);
+    });
+    // Watch for the process to end: report its exit code, then close the pseudo console (on Windows the output only
+    // ends then), after a moment for the last output.
+    std::thread::spawn(move || {
+        use tauri::Manager;
+        let code = loop {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            let state = app2.state::<Terminals>();
+            let mut map = state.map.lock().unwrap();
+            match map.get_mut(&id) {
+                None => return, // closed by the user
+                Some(t) => match t.child.try_wait() {
+                    Ok(Some(status)) => break Some(status.exit_code()),
+                    Ok(None) => continue,
+                    Err(_) => break None,
+                },
+            }
+        };
+        let _ = app2.emit("term-code", Code { id, code });
+        std::thread::sleep(std::time::Duration::from_millis(300));
+        app2.state::<Terminals>().map.lock().unwrap().remove(&id);
     });
     Ok(id)
 }

@@ -131,10 +131,12 @@ async function openProject(root, opts = {}) {
   tree.expanded = new Set([root, ...((sess && sess.expanded) || []).filter(p => isUnder(p, root))]);
   tree.children.clear(); tree.sel = null;
   recentFiles = ((sess && sess.recent) || []).filter(p => isUnder(p, root));
+  runState = {custom: (sess && sess.run && sess.run.custom) || [], selected: (sess && sess.run && sess.run.selected) || null};
   $('#emptyState').hidden = true; $('#editors').hidden = false;
   await monacoReady;
   ensureGroups(sess && sess.split ? 2 : 1);
   await refreshTree();
+  loadRunConfigs();
   if (sess && !opts.fresh) {
     for (let gi = 0; gi < groups.length; gi++) {
       for (const p of (sess.tabs && sess.tabs[gi]) || []) await openFile(p, {group: gi, focus: false, quiet: true, noRecent: true});
@@ -154,7 +156,7 @@ function saveSession() {
   try {
     localStorage.setItem(sessionKey(project.root), JSON.stringify({
       tabs: groups.map(g => g.tabs), active: groups.map(g => g.active), split: groups.length > 1,
-      expanded: [...tree.expanded].slice(0, 400), recent: recentFiles.slice(0, 30)
+      expanded: [...tree.expanded].slice(0, 400), recent: recentFiles.slice(0, 30), run: runState
     }));
   } catch (e) {}
 }
@@ -956,21 +958,26 @@ function termTheme() {
     selectionBackground: dark ? 'rgba(245,146,46,.35)' : 'rgba(232,113,10,.25)',
     ...(dark ? {} : {black: '#1f2328', brightBlack: '#57606a', white: '#6e7781', brightWhite: '#8c959f', yellow: '#9a6700', brightYellow: '#bf8700'})};
 }
-async function newTerminal(cwd) {
+async function newTerminal(cwd, run = null) {
   if (!project) return toast(t('toast.needProject'));
   if (!invoke) return;
   const el = document.createElement('div'); el.className = 'term-host'; $('#terms').append(el);
   const xterm = new Terminal({fontFamily: cssVar('--font-code') || 'Consolas, monospace', fontSize: Math.max(11, settings.fontSize - 1), cursorBlink: true,
     theme: termTheme(), scrollback: 5000, allowProposedApi: true, macOptionIsMeta: true});
   const fit = new FitAddon.FitAddon(); xterm.loadAddon(fit);
-  const term = {n: ++termSeq, el, xterm, fit, id: null, exited: false, title: t('ui.terminal') + (termSeq > 1 ? ' ' + termSeq : '')};
+  const term = {n: ++termSeq, el, xterm, fit, id: null, exited: false, run: null,
+    title: run ? '▶ ' + run.name : t('ui.terminal') + (termSeq > 1 ? ' ' + termSeq : '')};
   terms.push(term); activeTerm = term;
   showBottom('terminal'); renderBottomTabs();
   xterm.open(el);
+  addOutputLinks(term);
   await new Promise(r => requestAnimationFrame(r));
   try { fit.fit(); } catch (e) {}
-  try { term.id = await invoke('term_start', {cwd: cwd || project.root, cols: xterm.cols, rows: xterm.rows, shell: settings.shell || null}); }
-  catch (e) { xterm.writeln(`\x1b[31m${t('toast.termFail', {e})}\x1b[0m`); term.exited = true; }
+  if (run) await startRun(term, run, cwd || project.root);
+  else {
+    try { term.id = await invoke('term_start', {cwd: cwd || project.root, cols: xterm.cols, rows: xterm.rows, shell: settings.shell || null}); }
+    catch (e) { xterm.writeln(`\x1b[31m${t('toast.termFail', {e})}\x1b[0m`); term.exited = true; }
+  }
   xterm.onData(d => { if (term.id != null && !term.exited) invoke('term_write', {id: term.id, data: d}).catch(() => {}); });
   xterm.onResize(({cols, rows}) => { if (term.id != null && !term.exited) invoke('term_resize', {id: term.id, cols, rows}).catch(() => {}); });
   xterm.focus();
@@ -979,7 +986,14 @@ if (invoke) {
   window.__TAURI__.event.listen('term-data', ev => { const tm = terms.find(x => x.id === ev.payload.id); if (tm) tm.xterm.write(ev.payload.data); });
   window.__TAURI__.event.listen('term-exit', ev => {
     const tm = terms.find(x => x.id === ev.payload); if (!tm) return;
-    tm.exited = true; tm.xterm.writeln(`\r\n\x1b[90m[${t('ui.termExit')}]\x1b[0m`); renderBottomTabs();
+    tm.exited = true; if (!tm.run) tm.xterm.writeln(`\r\n\x1b[90m[${t('ui.termExit')}]\x1b[0m`); renderBottomTabs();
+  });
+  // Runs end with their exit code (green for 0).
+  window.__TAURI__.event.listen('term-code', ev => {
+    const tm = terms.find(x => x.id === ev.payload.id); if (!tm || !tm.run) return;
+    const c = ev.payload.code;
+    tm.code = c;
+    tm.xterm.writeln(`\r\n\x1b[${c === 0 ? 32 : 31}m[${t('run.exited', {c: c == null ? '?' : c})}]\x1b[0m`);
   });
 }
 function closeTerminal(term) {
@@ -1002,11 +1016,13 @@ function showBottom(tab) {
     if (activeTerm) setTimeout(() => { fitTerms(); activeTerm.xterm.focus(); }, 30);
   }
 }
+/* Run tabs show their state: ▶ running, ✓ finished with 0, ✗ other exit code or stopped. */
+const termTitle = tm => !tm.run ? tm.title + (tm.exited ? ' ✕' : '') : (!tm.exited ? '▶ ' : tm.code === 0 ? '✓ ' : '✗ ') + tm.run.name;
 function renderBottomTabs() {
   const pc = problemCount();
   const tabs = [`<button class="pt${settings.bottomTab === 'problems' ? ' active' : ''}" data-bt="problems">${esc(t('ui.problems'))}${pc.e + pc.w ? ` <span style="opacity:.7">${pc.e + pc.w}</span>` : ''}</button>`,
     `<button class="pt${settings.bottomTab === 'find' ? ' active' : ''}" data-bt="find">${esc(t('ui.find'))}</button>`,
-    ...terms.map(tm => `<button class="pt${settings.bottomTab === 'terminal' && tm === activeTerm ? ' active' : ''}" data-term="${tm.n}">${esc(tm.title)}${tm.exited ? ' ✕' : ''}<span class="x" data-term-close="${tm.n}">&#10005;</span></button>`)];
+    ...terms.map(tm => `<button class="pt${settings.bottomTab === 'terminal' && tm === activeTerm ? ' active' : ''}" data-term="${tm.n}">${esc(termTitle(tm))}<span class="x" data-term-close="${tm.n}">&#10005;</span></button>`)];
   if (!terms.length) tabs.push(`<button class="pt${settings.bottomTab === 'terminal' ? ' active' : ''}" data-bt="terminal">${esc(t('ui.terminal'))}</button>`);
   $('#bottomTabs').innerHTML = tabs.join('');
   $('#bottomBtns').innerHTML = `<button class="ibtn" data-act="newTerminal" title="${esc(t('a.newTerminal'))}">${ICONS.plus}</button>`;
@@ -1018,6 +1034,111 @@ $('#bottomTabs').addEventListener('click', e => {
   const tb = e.target.closest('[data-term]'); if (tb) { activeTerm = terms.find(x => x.n === +tb.dataset.term); settings.bottomTab = 'terminal'; showBottom(); renderBottomTabs(); return; }
   const b = e.target.closest('[data-bt]'); if (b) showBottom(b.dataset.bt);
 });
+
+/* ================= Run configurations ================= */
+/* What the project's build files offer (Rust: runconfig.rs), the user's own commands (kept with the project's session)
+   and "run current file". Each configuration runs in its own tab of the bottom panel; running it again restarts it
+   there. Positions like src/main.rs:12:5 in any terminal open the file. */
+let runState = {custom: [], selected: null}, runDetected = [];
+const runKey = c => c.custom ? 'c:' + c.name : 'd:' + (c.dir || '') + ':' + c.command;
+const quoted = f => `"${f}"`;
+const FILE_RUNNERS = {python: f => 'python ' + quoted(f), javascript: f => 'node ' + quoted(f), typescript: f => 'npx tsx ' + quoted(f), go: f => 'go run ' + quoted(f),
+  ruby: f => 'ruby ' + quoted(f), shell: f => 'bash ' + quoted(f), php: f => 'php ' + quoted(f), perl: f => 'perl ' + quoted(f), lua: f => 'lua ' + quoted(f),
+  powershell: f => 'powershell -NoProfile -ExecutionPolicy Bypass -File ' + quoted(f)};
+async function loadRunConfigs() {
+  runDetected = project && invoke ? await invoke('run_configs', {root: project.root}).catch(() => []) : [];
+  renderRunSel();
+}
+const allRunConfigs = () => [...runDetected, ...runState.custom.map(c => ({...c, custom: true}))];
+function renderRunSel() {
+  const sel = $('#runSel'); if (!sel) return;
+  const list = allRunConfigs(), opt = c => `<option value="${esc(runKey(c))}">${esc(c.name)}</option>`;
+  if (!list.some(c => runKey(c) === runState.selected)) runState.selected = list[0] ? runKey(list[0]) : null;
+  sel.innerHTML = (list.length ? '' : `<option value="">${esc(t('run.none'))}</option>`) +
+    (runDetected.length ? `<optgroup label="${esc(t('run.project'))}">${runDetected.map(opt).join('')}</optgroup>` : '') +
+    (runState.custom.length ? `<optgroup label="${esc(t('run.custom'))}">${runState.custom.map(c => opt({...c, custom: true})).join('')}</optgroup>` : '') +
+    (project ? `<option value="__edit">${esc(t('a.editRunConfigs'))}</option>` : '');
+  sel.value = runState.selected || '';
+  sel.disabled = !project;
+}
+$('#runSel').addEventListener('change', e => {
+  if (e.target.value === '__edit') { renderRunSel(); return editRunConfigs(); }
+  runState.selected = e.target.value; saveSession(); e.target.blur();
+});
+async function startRun(term, run, cwd) {
+  term.run = {...run, cwd}; term.code = null;
+  term.xterm.writeln(`\x1b[90m${cwd}> ${run.command}\x1b[0m`);
+  try { term.id = await invoke('term_start', {cwd, cols: term.xterm.cols, rows: term.xterm.rows, shell: null, run: run.command}); term.exited = false; }
+  catch (e) { term.xterm.writeln(`\x1b[31m${t('toast.termFail', {e})}\x1b[0m`); term.exited = true; }
+}
+async function runConfig(c) {
+  if (!project || !c || !invoke) return;
+  if (dirtyFiles().length) await saveAll(true);   // like other IDEs: run what is in the editor
+  const cwd = c.cwd || join(project.root, c.dir || ''), key = c.key || runKey(c);
+  const run = {key, name: c.name, command: c.command};
+  const term = terms.find(x => x.run && x.run.key === key);
+  if (!term) return newTerminal(cwd, run);
+  if (term.id != null && !term.exited) await invoke('term_kill', {id: term.id}).catch(() => {});
+  term.id = null; term.xterm.reset();
+  activeTerm = term; showBottom('terminal'); renderBottomTabs();
+  await startRun(term, run, cwd);
+  renderBottomTabs();
+}
+function runSelected() {
+  const c = allRunConfigs().find(x => runKey(x) === runState.selected);
+  return c ? runConfig(c) : editRunConfigs();
+}
+function runCurrentFile() {
+  const f = curFile(); if (!f || f.kind !== 'text') return;
+  const r = FILE_RUNNERS[f.model.getLanguageId()];
+  if (!r) return toast(t('run.noRunner', {lang: f.model.getLanguageId()}));
+  runConfig({name: baseName(f.path), command: r(f.path), cwd: dirName(f.path), key: 'f:' + f.path});
+}
+function stopRun() {
+  const live = x => x.run && x.id != null && !x.exited;
+  const tm = activeTerm && live(activeTerm) ? activeTerm : terms.find(live);
+  if (!tm) return toast(t('run.nothing'));
+  invoke('term_kill', {id: tm.id}).catch(() => {});
+  tm.xterm.writeln(`\r\n\x1b[33m[${t('run.stopped')}]\x1b[0m`);
+}
+/* Own configurations: name, command line, folder (relative to the project). */
+function editRunConfigs() {
+  if (!project) return;
+  const list = runState.custom.map(c => ({...c}));
+  const row = (c, i) => `<div class="rc-row" data-i="${i}"><input class="field-in" data-f="name" value="${esc(c.name)}" placeholder="${esc(t('run.name'))}" spellcheck="false">
+    <input class="field-in rc-cmd" data-f="command" value="${esc(c.command)}" placeholder="${esc(t('run.command'))}" spellcheck="false">
+    <input class="field-in" data-f="dir" value="${esc(c.dir || '')}" placeholder="${esc(t('run.dir'))}" spellcheck="false"><button class="btn-sm" data-del="${i}" title="${esc(t('ctx.delete'))}">✕</button></div>`;
+  const draw = () => { $('#rcList').innerHTML = list.length ? list.map(row).join('') : `<p class="hint">${esc(t('run.noneCustom'))}</p>`; };
+  modal(t('a.editRunConfigs').replace('…', ''), `<p class="hint">${esc(t('run.hint'))}</p><div id="rcList"></div>
+    <button class="btn-sm" id="rcAdd">${esc(t('run.add'))}</button>
+    ${runDetected.length ? `<label class="lbl" style="margin-top:14px">${esc(t('run.project'))}</label><div class="rc-detected">${runDetected.map(c =>
+      `<div><b>${esc(c.name)}</b> <code>${esc(c.command)}</code></div>`).join('')}</div>` : ''}`,
+    [{label: t('ui.cancel'), onClick: closeModal}, {label: t('ui.save'), primary: true, onClick: () => {
+      runState.custom = list.filter(c => c.name.trim() && c.command.trim()).map(c => ({name: c.name.trim(), command: c.command.trim(), dir: (c.dir || '').trim()}));
+      saveSession(); renderRunSel(); closeModal();
+    }}]);
+  draw();
+  $('#rcList').addEventListener('input', e => { const r = e.target.closest('.rc-row'); if (r && e.target.dataset.f) list[+r.dataset.i][e.target.dataset.f] = e.target.value; });
+  $('#rcList').addEventListener('click', e => { const d = e.target.closest('[data-del]'); if (d) { list.splice(+d.dataset.del, 1); draw(); } });
+  $('#rcAdd').onclick = () => { list.push({name: '', command: '', dir: ''}); draw(); $('#rcList .rc-row:last-child input').focus(); };
+}
+/* src/main.rs:12:5, C:\x\y.py:3, ./a/b.ts(4,2) … in terminal output open the file at that line. */
+function addOutputLinks(term) {
+  const re = /((?:[A-Za-z]:)?[\w.\-\/\\]*[\w\-]\.[A-Za-z][\w]{0,5})(?::(\d+)(?::(\d+))?|\((\d+),(\d+)\))/g;
+  term.xterm.registerLinkProvider({provideLinks(y, done) {
+    const line = term.xterm.buffer.active.getLine(y - 1); if (!line || !project) return done(undefined);
+    const text = line.translateToString(true), links = [];
+    for (const m of text.matchAll(re)) {
+      const file = m[1], ln = +(m[2] || m[4]), col = +(m[3] || m[5] || 1);
+      links.push({range: {start: {x: m.index + 1, y}, end: {x: m.index + m[0].length, y}}, text: m[0],
+        activate: () => {
+          const abs = /^([A-Za-z]:|[\\/])/.test(file) ? file : join((term.run && term.run.cwd) || project.root, file);
+          openFile(abs, {line: ln, col});
+        }});
+    }
+    done(links);
+  }});
+}
 
 /* ================= Problems (from language servers) ================= */
 function problemCount() {
@@ -1161,6 +1282,8 @@ function newProject() {
 /* ================= Actions, menus, toolbars, shortcuts ================= */
 const svg = d => `<svg viewBox="0 0 24 24">${d}</svg>`;
 const ICONS = {
+  run: svg('<path d="M8 5v14l11-7z" style="fill:#59a869;stroke:#59a869"/>'),
+  stop: svg('<rect x="6" y="6" width="12" height="12" rx="1.5" style="fill:#d7373f;stroke:#d7373f"/>'),
   open: svg('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'),
   newProject: svg('<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v8M8 12h8"/>'),
   newFile: svg('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11v6M9 14h6"/>'),
@@ -1201,6 +1324,7 @@ const DEF_LANGS = ['typescript', 'javascript', 'css', 'scss', 'less', 'json', 'h
 /* Declarations, usages and rename need a language server (or Monaco's own TypeScript/CSS/HTML support). */
 const smart = ed => DEF_LANGS.includes(ed.getModel().getLanguageId()) || LSP.hasClient(ed.getModel().getLanguageId());
 const A = {
+  run: () => runSelected(), runFile: () => runCurrentFile(), stopRun: () => stopRun(), editRunConfigs: () => editRunConfigs(),
   toggleAutoHide: () => { settings.autoHide = !settings.autoHide; applySettings(); },
   newProject, openFolder: async () => { const p = await invoke('pick_folder'); if (p) openProject(p); }, closeProject: () => closeProject(false),
   newFile: () => newFile(), newFolder: () => newFolder(), saveAll: () => saveAll(), localHistory: () => localHistory(),
@@ -1279,6 +1403,7 @@ const MENUS = [
     ['goToDefinition', 'Ctrl+B'], ['goToImplementation', 'Ctrl+Alt+B'], ['findUsages', 'Alt+F7'], ['selectInProject', 'Alt+F1'], '-', ['nextTab', 'Alt+ArrowRight'], ['prevTab', 'Alt+ArrowLeft']]],
   ['code', [['quickFix', 'Alt+Enter'], ['quickDoc', 'Ctrl+Q'], ['parameterInfo', 'Ctrl+P'], '-', ['formatCode', 'Ctrl+Alt+L'], ['commentLine', 'Ctrl+/'], ['blockComment', 'Ctrl+Shift+/', null, false, ['Ctrl+?']], '-', ['renameSymbol', 'Shift+F6'], '-',
     ['fold', 'Ctrl+-'], ['unfold', 'Ctrl+=', null, false, ['Ctrl++']], ['foldAll', 'Ctrl+Shift+-', null, false, ['Ctrl+_']], ['unfoldAll', 'Ctrl+Shift+=']]],
+  ['run', [['run', 'Shift+F10'], ['runFile', 'Ctrl+Shift+F10'], ['stopRun', 'Ctrl+F2'], '-', ['editRunConfigs']]],
   ['settings', [['settings', 'Ctrl+Alt+S'], '-', '#menu.language',
     ['langAuto', null, () => settings.lang === 'auto'], ['langEn', null, () => settings.lang === 'en'], ['langDe', null, () => settings.lang === 'de'],
     '-', '#menu.theme',
@@ -1293,7 +1418,7 @@ function buildKeymap() {
   MENUS.forEach(([, items]) => items.forEach(it => { if (!Array.isArray(it)) return; if (it[1] && !it[3]) KEYMAP[it[1]] = it[0]; (it[4] || []).forEach(k => KEYMAP[k] = it[0]); }));
 }
 buildKeymap();
-const NEEDS_EDITOR = new Set(['undo', 'redo', 'duplicateLine', 'deleteLine', 'moveLineUp', 'moveLineDown', 'expandSelection', 'shrinkSelection', 'addNextOccurrence',
+const NEEDS_EDITOR = new Set(['runFile', 'undo', 'redo', 'duplicateLine', 'deleteLine', 'moveLineUp', 'moveLineDown', 'expandSelection', 'shrinkSelection', 'addNextOccurrence',
   'selectAllOccurrences', 'find', 'replace', 'goToLine', 'goToDefinition', 'goToImplementation', 'findUsages', 'quickFix', 'quickDoc', 'parameterInfo', 'formatCode', 'commentLine', 'blockComment', 'fold', 'unfold', 'foldAll', 'unfoldAll', 'localHistory']);
 const NO_PROJECT = new Set(['toggleAutoHide', 'newProject', 'openFolder', 'settings', 'langAuto', 'langEn', 'langDe', 'themeDark', 'themeLight', 'themeGithub', 'themeGithubDark',
   'shortcuts', 'about', 'togglePanels', 'hideAll', 'wordWrap', 'minimap', 'whitespace', 'findAction', 'searchEverywhere']);
@@ -1350,6 +1475,7 @@ function makeBtn(act, html) {
 function buildToolbars() {
   const fill = (id, list) => { const box = $(id); box.innerHTML = ''; list.forEach(([a, i]) => box.append(makeBtn(a, i))); };
   fill('#fileBtns', [['openFolder', ICONS.open], ['newProject', ICONS.newProject], ['newFile', ICONS.newFile], ['saveAll', ICONS.save], ['undo', ICONS.undo], ['redo', ICONS.redo]]);
+  fill('#runBtns', [['run', ICONS.run], ['stopRun', ICONS.stop]]);
   fill('#navBtns', [['back', ICONS.back], ['forward', ICONS.forward], ['goToFile', ICONS.file], ['recentFiles', ICONS.recent], ['findInFiles', ICONS.findFiles]]);
   fill('#viewBtns', [['toggleTerminal', ICONS.terminal], ['toggleBottom', ICONS.bottom], ['togglePanels', ICONS.panel], ['settings', ICONS.gear], ['shortcuts', ICONS.help]]);
   const tools = $('#tools'); tools.innerHTML = '';

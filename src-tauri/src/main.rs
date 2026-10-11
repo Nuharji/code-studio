@@ -4,6 +4,7 @@
 mod codespell;
 mod fuzzy;
 mod lsp;
+mod runconfig;
 mod spell;
 mod symbols;
 mod terminal;
@@ -525,6 +526,7 @@ fn main() {
             fuzzy::fuzzy_files,
             fuzzy::fuzzy_rank,
             codespell::code_spell,
+            runconfig::run_configs,
             spell::spell_check,
             spell::spell_suggest,
             spell::spell_add,

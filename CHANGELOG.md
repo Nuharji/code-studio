@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.0 — 2026-10-11
+- Run configurations (stage 3a): the toolbar has a configuration list with ▶ Run (Shift+F10) and ■ Stop (Ctrl+F2). Code Studio finds what the project offers — cargo run/test/build (also in subfolders like src-tauri), npm/pnpm/yarn/bun scripts, go, python, make targets, dotnet — and you can add your own commands (Run → Edit Configurations…, saved with the project).
+- Run → Run Current File (Ctrl+Shift+F10) for Python, JavaScript/TypeScript, Go, Ruby, PHP, Perl, Lua, shell and PowerShell files.
+- Each configuration runs in its own tab of the bottom panel (▶ running, ✓ exit code 0, ✗ error); running it again restarts it there; changed files are saved first. Positions like src/main.rs:12:5 in the output open the file.
+
 ## 0.5.0 — 2026-10-11
 - New: Settings → Shortcuts. Every menu command can get its own key: click it and press the new combination (with Ctrl or Alt, or a function key); Backspace removes a shortcut, ↺ or “Reset all” brings the defaults back. A key that another command used is moved (you get a note); system keys like Copy stay fixed. Menus, tooltips and Help → Keyboard Shortcuts show your keys.
 

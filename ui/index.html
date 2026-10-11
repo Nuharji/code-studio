@@ -93,6 +93,10 @@ svg.i{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stro
 .dropdown .chk{font-size:11px}
 .dropdown hr{border:0;border-top:1px solid var(--dd-border);margin:4px 0}
 .dropdown .dd-label{padding:6px 16px 2px 26px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim)}
+.run-box{gap:4px}.run-sel{max-width:220px;height:26px;background:var(--input-bg,var(--chrome2));color:var(--text);border:1px solid var(--border);border-radius:4px;padding:0 6px;font:inherit}
+.run-box #runBtns{display:flex;gap:1px}
+.rc-row{display:grid;grid-template-columns:1fr 2fr 1fr auto;gap:6px;margin-bottom:6px}
+.rc-detected{max-height:180px;overflow:auto;font-size:12px;line-height:1.8}.rc-detected code{color:var(--dim);font-family:var(--font-code,Consolas,monospace)}
 .apptitle{flex:1;text-align:center;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 12px}
 .cta{margin-right:10px;height:24px;padding:0 16px;border-radius:var(--cta-radius);border:0;background:var(--cta);color:var(--on-accent);font-weight:600}
 .cta:hover{background:var(--cta-hover)}
@@ -371,6 +375,7 @@ select:focus,input:focus{border-color:var(--accent)}
     <button class="search-btn" data-act="searchEverywhere"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span data-i18n="ui.searchEverywhere"></span><kbd data-i18n="ui.doubleShift"></kbd></button>
   </div>
   <div class="group" id="navBtns"></div>
+  <div class="group run-box"><select id="runSel" class="run-sel" disabled></select><span id="runBtns"></span></div>
   <div class="spacer"></div>
   <div class="group"><div class="seg" id="layoutSeg"></div></div>
   <div class="group" id="viewBtns"></div>
