@@ -520,12 +520,13 @@ dependencies = [
 
 [[package]]
 name = "code-studio"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "ignore",
  "portable-pty",
  "regex",
  "serde",
+ "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-clipboard-manager",

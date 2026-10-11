@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.4 — 2026-10-11
+- The English and German texts are now language files (src-tauri/i18n) delivered by the app's Rust core instead of being part of the JavaScript.
+
 ## 0.2.3 — 2026-10-10
 - Toolbar and tool-rail buttons no longer stay outlined when their panel is open — like in Markdown Studio; the panel tabs show what's open.
 
