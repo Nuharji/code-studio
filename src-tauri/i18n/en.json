@@ -365,5 +365,6 @@
   "rt.summary": "✓ {p} passed · ✗ {f} failed",
   "rt.rerunFailed": "Rerun Failed",
   "rt.rerun": "Rerun",
-  "rt.failedRun": "Failed tests"
+  "rt.failedRun": "Failed tests",
+  "ac.snippet": "Snippet (Tab moves on)"
 }

@@ -1168,6 +1168,69 @@ $('#gitAmend').addEventListener('change', renderGit);
 $('#gitCommitBtn').addEventListener('click', gitCommit);
 function showDockTab(tab) { settings.dock = true; settings.dockTab = tab; applyLayout(); }
 
+/* ================= Built-in completion ================= */
+/* Without a language server the suggestion list still has the language's keywords, common snippets (Tab moves through
+   the parts) and the words of open files of that language. With a server running, it gives the suggestions. */
+const KW = s => s.split(' ');
+const KEYWORDS = {
+  rust: KW('as async await break const continue crate dyn else enum extern false fn for if impl in let loop match mod move mut pub ref return self Self static struct super trait true type unsafe use where while Some None Ok Err Option Result Vec String Box println format vec'),
+  python: KW('False None True and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield self print len range list dict set str int float bool open isinstance enumerate zip'),
+  go: KW('break case chan const continue default defer else fallthrough for func go goto if import interface map package range return select struct switch type var nil true false error string int bool byte rune make append len cap new panic'),
+  c: KW('auto break case char const continue default do double else enum extern float for goto if int long register return short signed sizeof static struct switch typedef union unsigned void volatile while NULL include define printf malloc free'),
+  cpp: KW('auto break case char class const constexpr continue default delete do double else enum explicit extern false float for friend if inline int long namespace new noexcept nullptr operator override private protected public return short signed sizeof static struct switch template this throw true try typedef typename union unsigned using virtual void volatile while std vector string cout endl include'),
+  csharp: KW('abstract as async await base bool break case catch char class const continue decimal default delegate do double else enum event explicit false finally float for foreach get if int interface internal is namespace new null object override private protected public readonly record return sealed set static string struct switch this throw true try typeof using var void while Console WriteLine'),
+  java: KW('abstract boolean break byte case catch char class continue default do double else enum extends final finally float for if implements import instanceof int interface long new null package private protected public record return short static String super switch this throw throws true false try var void while System out println'),
+  php: KW('abstract array as break case catch class const continue declare default do echo else elseif empty extends final fn for foreach function global if implements include interface isset match namespace new null private protected public readonly require return static switch throw trait try unset use while'),
+  shell: KW('if then else elif fi for while until do done case esac function return in echo export local read exit set unset shift source'),
+  lua: KW('and break do else elseif end false for function goto if in local nil not or repeat return then true until while print require pairs ipairs table string'),
+  ruby: KW('alias and begin break case class def defined do else elsif end ensure false for if in module next nil not or redo rescue retry return self super then true undef unless until when while yield puts require attr_accessor'),
+  sql: KW('SELECT FROM WHERE INSERT INTO VALUES UPDATE SET DELETE CREATE TABLE ALTER DROP INDEX JOIN LEFT RIGHT INNER OUTER ON GROUP BY ORDER HAVING LIMIT OFFSET AS AND OR NOT NULL IS IN LIKE DISTINCT COUNT SUM AVG MIN MAX PRIMARY KEY FOREIGN REFERENCES'),
+  kotlin: KW('as break class continue do else false for fun if in interface is null object package return super this throw true try typealias val var when while data sealed override private public internal suspend println'),
+  swift: KW('associatedtype class deinit enum extension func import init inout internal let operator private protocol public static struct subscript typealias var break case continue default defer do else fallthrough for guard if in repeat return switch where while as false is nil self Self super throw throws true try print')
+};
+const SNIPPETS = {
+  rust: [['fn', 'fn ${1:name}(${2}) {\n\t$0\n}'], ['test', '#[test]\nfn ${1:name}() {\n\t$0\n}'], ['if', 'if ${1:condition} {\n\t$0\n}'], ['for', 'for ${1:item} in ${2:iter} {\n\t$0\n}'],
+    ['match', 'match ${1:value} {\n\t${2:_} => $0,\n}'], ['struct', 'struct ${1:Name} {\n\t$0\n}'], ['impl', 'impl ${1:Name} {\n\t$0\n}'], ['println', 'println!("${1:{\\}}"${2:, value});']],
+  python: [['def', 'def ${1:name}(${2}):\n\t${0:pass}'], ['class', 'class ${1:Name}:\n\tdef __init__(self${2}):\n\t\t${0:pass}'], ['if', 'if ${1:condition}:\n\t${0:pass}'],
+    ['for', 'for ${1:item} in ${2:items}:\n\t${0:pass}'], ['with', 'with ${1:open(path)} as ${2:f}:\n\t${0:pass}'], ['try', 'try:\n\t${1:pass}\nexcept ${2:Exception} as e:\n\t${0:raise}'],
+    ['ifmain', 'if __name__ == "__main__":\n\t${0:main()}']],
+  go: [['func', 'func ${1:name}(${2}) ${3}{\n\t$0\n}'], ['iferr', 'if err != nil {\n\treturn ${1:err}\n}'], ['for', 'for ${1:i} := 0; $1 < ${2:n}; $1++ {\n\t$0\n}'],
+    ['forr', 'for ${1:_}, ${2:v} := range ${3:items} {\n\t$0\n}'], ['test', 'func Test${1:Name}(t *testing.T) {\n\t$0\n}'], ['main', 'func main() {\n\t$0\n}']],
+  c: [['main', 'int main(void) {\n\t$0\n\treturn 0;\n}'], ['for', 'for (int ${1:i} = 0; $1 < ${2:n}; $1++) {\n\t$0\n}'], ['if', 'if (${1:condition}) {\n\t$0\n}'], ['inc', '#include <${1:stdio.h}>']],
+  cpp: [['main', 'int main() {\n\t$0\n\treturn 0;\n}'], ['for', 'for (int ${1:i} = 0; $1 < ${2:n}; ++$1) {\n\t$0\n}'], ['forr', 'for (auto& ${1:item} : ${2:items}) {\n\t$0\n}'], ['class', 'class ${1:Name} {\npublic:\n\t$0\n};']],
+  csharp: [['class', 'public class ${1:Name}\n{\n\t$0\n}'], ['prop', 'public ${1:int} ${2:Name} { get; set; }'], ['foreach', 'foreach (var ${1:item} in ${2:items})\n{\n\t$0\n}'], ['cw', 'Console.WriteLine(${1});']],
+  java: [['main', 'public static void main(String[] args) {\n\t$0\n}'], ['sout', 'System.out.println(${1});'], ['for', 'for (int ${1:i} = 0; $1 < ${2:n}; $1++) {\n\t$0\n}'], ['class', 'public class ${1:Name} {\n\t$0\n}']],
+  shell: [['if', 'if [ ${1:condition} ]; then\n\t$0\nfi'], ['for', 'for ${1:item} in ${2:list}; do\n\t$0\ndone'], ['func', '${1:name}() {\n\t$0\n}'], ['shebang', '#!/usr/bin/env bash\nset -euo pipefail\n$0']],
+  lua: [['function', 'function ${1:name}(${2})\n\t$0\nend'], ['for', 'for ${1:i} = 1, ${2:n} do\n\t$0\nend'], ['forp', 'for ${1:k}, ${2:v} in pairs(${3:t}) do\n\t$0\nend'], ['if', 'if ${1:condition} then\n\t$0\nend']],
+  ruby: [['def', 'def ${1:name}\n\t$0\nend'], ['class', 'class ${1:Name}\n\t$0\nend'], ['each', '${1:items}.each do |${2:item}|\n\t$0\nend']],
+  php: [['function', 'function ${1:name}(${2})\n{\n\t$0\n}'], ['class', 'class ${1:Name}\n{\n\t$0\n}'], ['foreach', 'foreach (\\$${1:items} as \\$${2:item}) {\n\t$0\n}']]
+};
+function registerBuiltinCompletion() {
+  const K = monaco.languages.CompletionItemKind, SNIP = monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet;
+  const langs = new Set([...Object.keys(KEYWORDS), ...Object.keys(SNIPPETS), 'yaml', 'ini', 'markdown', 'plaintext', 'dockerfile', 'powershell', 'perl', 'r', 'scala', 'dart', 'elixir']);
+  for (const lang of langs) {
+    monaco.languages.registerCompletionItemProvider(lang, {provideCompletionItems(model, pos) {
+      if (LSP.hasClient(lang)) return {suggestions: []};
+      const w = model.getWordUntilPosition(pos), range = new monaco.Range(pos.lineNumber, w.startColumn, pos.lineNumber, w.endColumn), seen = new Set();
+      const out = [];
+      for (const [label, body] of SNIPPETS[lang] || []) out.push({label, kind: K.Snippet, insertText: body, insertTextRules: SNIP, range, detail: t('ac.snippet'), sortText: '1' + label,
+        documentation: {value: '```\n' + body.replace(/\$\{\d+:?([^}]*)\}/g, '$1').replace(/\$\d/g, '') + '\n```'}});
+      for (const k of KEYWORDS[lang] || []) if (!seen.has(k)) { seen.add(k); out.push({label: k, kind: K.Keyword, insertText: k, range, sortText: '2' + k}); }
+      // Words of the open files of this language (not the one being typed).
+      const typing = w.word;
+      for (const m of monaco.editor.getModels()) {
+        if (m.getLanguageId() !== lang || m.getValueLength() > 2e6) continue;
+        for (const word of m.getValue().match(/[\p{L}_$][\p{L}\p{N}_$]{2,}/gu) || []) {
+          if (seen.has(word) || word === typing) continue;
+          seen.add(word); out.push({label: word, kind: K.Text, insertText: word, range, sortText: '3' + word});
+          if (seen.size > 3000) break;
+        }
+      }
+      return {suggestions: out};
+    }});
+  }
+}
+
 /* ================= Run & test from the code ================= */
 /* A ▶ next to fn main, tests and test modules (Rust: runnables.rs finds them with the exact command); click runs just
    that, right-click offers "save as configuration". After a test run the ▶ turns green or red and the Tests tab lists
@@ -2144,7 +2207,7 @@ function registerSpellActions() {
   applySettings();
   renderRecent(); renderFind(); renderTodo(); buildStructure(); renderTests();
   await monacoReady;
-  defineThemes(); registerSpellActions();
+  defineThemes(); registerSpellActions(); registerBuiltinCompletion();
   monaco.editor.setTheme('studio-' + settings.theme);
   booted = true;
   let start = invoke ? await invoke('initial_path').catch(() => null) : null, file = null;

@@ -365,5 +365,6 @@
   "rt.summary": "✓ {p} bestanden · ✗ {f} fehlgeschlagen",
   "rt.rerunFailed": "Fehlgeschlagene erneut",
   "rt.rerun": "Erneut ausführen",
-  "rt.failedRun": "Fehlgeschlagene Tests"
+  "rt.failedRun": "Fehlgeschlagene Tests",
+  "ac.snippet": "Vorlage (Tab springt weiter)"
 }

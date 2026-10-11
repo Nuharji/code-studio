@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.0 — 2026-10-11
+- Autocomplete for more languages: Code Studio now uses the language servers for Go (gopls), C/C++ (clangd), C# (csharp-ls), Java (jdtls), PHP (Intelephense), Shell (bash-language-server), YAML, Lua, Ruby (ruby-lsp) and Markdown (Marksman) when they are installed — the status bar shows the install command for a missing one.
+- Without a language server, suggestions still include the language’s keywords, common snippets (fn, test, if, for, match, iferr, def, class, main …; Tab moves through the parts) and the words of open files of that language — for Rust, Python, Go, C/C++, C#, Java, PHP, Shell, Lua, Ruby, SQL, Kotlin, Swift and more.
+
 ## 0.8.0 — 2026-10-11
 - Run & test from the code: a ▶ next to the line numbers at `fn main`, every test and test module (Rust `#[test]`, Python `test_…` / test classes / `__main__`, Go `TestXxx` / `main`, JavaScript/TypeScript `test` / `it` / `describe` with Jest, Vitest or node:test). Click runs exactly that; right-click saves it as a run configuration or copies the command.
 - After a run the ▶ turns green or red (a module is green when all its tests passed). The new Tests tab in the bottom panel lists passed and failed tests (click one to jump to it), with “Rerun failed” for cargo, pytest and go and “Rerun”. Test commands from run configurations are read the same way.

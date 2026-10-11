@@ -8,7 +8,18 @@ const LSP = (() => {
       init: {checkOnSave: true, cargo: {buildScripts: {enable: true}}, procMacro: {enable: true}}},
     python: {name: 'Pyright', langs: ['python'], cmd: 'pyright-langserver', args: ['--stdio'], version: null, install: 'npm install -g pyright'},
     ts: {name: 'TypeScript', langs: ['typescript', 'javascript'], cmd: 'typescript-language-server', args: ['--stdio'], version: '--version',
-      install: 'npm install -g typescript-language-server typescript'}
+      install: 'npm install -g typescript-language-server typescript'},
+    // More languages: each is used when it is installed (Code Studio shows the install command otherwise).
+    go: {name: 'gopls', langs: ['go'], cmd: 'gopls', args: [], version: 'version', install: 'go install golang.org/x/tools/gopls@latest'},
+    c: {name: 'clangd', langs: ['c', 'cpp', 'objective-c'], cmd: 'clangd', args: ['--background-index'], version: '--version', install: 'winget install LLVM.LLVM  (or: brew install llvm / apt install clangd)'},
+    csharp: {name: 'csharp-ls', langs: ['csharp'], cmd: 'csharp-ls', args: [], version: null, install: 'dotnet tool install -g csharp-ls'},
+    java: {name: 'Eclipse JDT LS', langs: ['java'], cmd: 'jdtls', args: [], version: null, install: 'scoop install jdtls  (or: brew install jdtls)'},
+    php: {name: 'Intelephense', langs: ['php'], cmd: 'intelephense', args: ['--stdio'], version: null, install: 'npm install -g intelephense'},
+    shell: {name: 'Bash Language Server', langs: ['shell'], cmd: 'bash-language-server', args: ['start'], version: '--version', install: 'npm install -g bash-language-server'},
+    yaml: {name: 'YAML Language Server', langs: ['yaml'], cmd: 'yaml-language-server', args: ['--stdio'], version: null, install: 'npm install -g yaml-language-server'},
+    lua: {name: 'Lua Language Server', langs: ['lua'], cmd: 'lua-language-server', args: [], version: '--version', install: 'winget install LuaLS.lua-language-server  (or: brew install lua-language-server)'},
+    ruby: {name: 'Ruby LSP', langs: ['ruby'], cmd: 'ruby-lsp', args: [], version: null, install: 'gem install ruby-lsp'},
+    markdown: {name: 'Marksman', langs: ['markdown'], cmd: 'marksman', args: ['server'], version: null, install: 'winget install Artempyanykh.Marksman  (or: brew install marksman)'}
   };
   const serverFor = lang => Object.entries(SERVERS).find(([, s]) => s.langs.includes(lang));
   const clients = new Map();     // key -> Client
