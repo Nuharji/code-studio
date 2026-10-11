@@ -10,6 +10,7 @@ mod runnables;
 mod spell;
 mod symbols;
 mod terminal;
+mod tools;
 
 use serde::{Deserialize, Serialize};
 use std::{
@@ -531,6 +532,9 @@ fn main() {
             runconfig::run_configs,
             runnables::runnables,
             runnables::test_results,
+            tools::format_text,
+            tools::lint_file,
+            tools::lint_fix,
             git::git_status,
             git::git_head_text,
             git::git_line_changes,

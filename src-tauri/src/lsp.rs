@@ -51,7 +51,7 @@ fn extra_dirs() -> Vec<PathBuf> {
 }
 
 /// Finds an executable by name in PATH and the usual tool folders (on Windows also name.exe / .cmd).
-fn find_exe(name: &str) -> Option<PathBuf> {
+pub(crate) fn find_exe(name: &str) -> Option<PathBuf> {
     let p = Path::new(name);
     if p.is_absolute() {
         return p.is_file().then(|| p.to_path_buf());
@@ -70,7 +70,7 @@ fn find_exe(name: &str) -> Option<PathBuf> {
     None
 }
 
-fn command_for(exe: &Path, args: &[String]) -> Command {
+pub(crate) fn command_for(exe: &Path, args: &[String]) -> Command {
     // npm installs servers as .cmd scripts, which Windows can only start through cmd.
     let script = exe.extension().is_some_and(|e| e.eq_ignore_ascii_case("cmd") || e.eq_ignore_ascii_case("bat"));
     let mut cmd = if script {

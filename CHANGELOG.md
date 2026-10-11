@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.0 — 2026-10-11
+- Format on save (Settings → Editor → On save): Ctrl+S formats changed files with the project’s own tool — rustfmt (with the crate’s edition), gofmt, Ruff or Black, Prettier (when the project or PATH has it), clang-format — using your config files; otherwise the language server’s or the editor’s formatter. Autosave doesn’t format, so nothing jumps while you type. Code → Reformat Code (Ctrl+Alt+L) uses the same tools.
+- Linters: after saving, ESLint (the project’s) and Ruff results appear as squiggles and in the Problems panel, with “Fix all … problems in the file” as a quick fix (Code → Fix Linter Problems). For Rust, rust-analyzer can check with Clippy instead of cargo check (setting); Code → Apply Clippy Fixes runs `cargo clippy --fix`.
+- Code → Optimize Imports (Ctrl+Alt+O) through the language server (Ruff for Python).
+- A missing formatter is mentioned once, with its install command.
+
 ## 0.9.0 — 2026-10-11
 - Autocomplete for more languages: Code Studio now uses the language servers for Go (gopls), C/C++ (clangd), C# (csharp-ls), Java (jdtls), PHP (Intelephense), Shell (bash-language-server), YAML, Lua, Ruby (ruby-lsp) and Markdown (Marksman) when they are installed — the status bar shows the install command for a missing one.
 - Without a language server, suggestions still include the language’s keywords, common snippets (fn, test, if, for, match, iferr, def, class, main …; Tab moves through the parts) and the words of open files of that language — for Rust, Python, Go, C/C++, C#, Java, PHP, Shell, Lua, Ruby, SQL, Kotlin, Swift and more.

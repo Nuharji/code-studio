@@ -366,5 +366,18 @@
   "rt.rerunFailed": "Rerun Failed",
   "rt.rerun": "Rerun",
   "rt.failedRun": "Failed tests",
-  "ac.snippet": "Snippet (Tab moves on)"
+  "ac.snippet": "Snippet (Tab moves on)",
+  "set.onSave": "On save",
+  "set.formatOnSave": "Format code on save (Ctrl+S, not on autosave)",
+  "set.lintOnSave": "Run linters after saving (ESLint, Ruff)",
+  "set.useClippy": "Rust: check with Clippy instead of cargo check",
+  "a.optimizeImports": "Optimize Imports",
+  "a.fixLint": "Fix Linter Problems",
+  "a.clippyFix": "Apply Clippy Fixes",
+  "fmt.missing": "{tool} is not installed — {cmd}",
+  "fmt.failed": "{tool}: {e}",
+  "fmt.importsDone": "Imports optimized.",
+  "fmt.noImports": "Optimize imports needs a language server here (Ruff for Python).",
+  "lint.fixAll": "Fix all {source} problems in the file",
+  "lint.fixed": "Linter fixes applied."
 }

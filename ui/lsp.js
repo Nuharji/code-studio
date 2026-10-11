@@ -5,7 +5,8 @@
 const LSP = (() => {
   const SERVERS = {
     rust: {name: 'rust-analyzer', langs: ['rust'], cmd: 'rust-analyzer', args: [], version: '--version', install: 'rustup component add rust-analyzer',
-      init: {checkOnSave: true, cargo: {buildScripts: {enable: true}}, procMacro: {enable: true}}},
+      // Checks on save with Clippy instead of cargo check when that setting is on (asked again after a change).
+      get init() { return {checkOnSave: true, check: {command: typeof settings !== 'undefined' && settings.useClippy ? 'clippy' : 'check'}, cargo: {buildScripts: {enable: true}}, procMacro: {enable: true}}; }},
     python: {name: 'Pyright', langs: ['python'], cmd: 'pyright-langserver', args: ['--stdio'], version: null, install: 'npm install -g pyright'},
     ts: {name: 'TypeScript', langs: ['typescript', 'javascript'], cmd: 'typescript-language-server', args: ['--stdio'], version: '--version',
       install: 'npm install -g typescript-language-server typescript'},
@@ -255,6 +256,19 @@ const LSP = (() => {
       return {actions, dispose() {}};
     }});
   }
+  /* "Optimize imports": the server's organize-imports action for the whole file; false when it has none. */
+  async function organizeImports(model) {
+    const e = serverFor(model.getLanguageId()); if (!e || !hasClient(model.getLanguageId())) return false;
+    const full = model.getFullModelRange();
+    const r = await call(model, 'textDocument/codeAction', {...docParams(model), range: {start: toPos(full.getStartPosition()), end: toPos(full.getEndPosition())},
+      context: {diagnostics: [], only: ['source.organizeImports'], triggerKind: 1}});
+    const a = (r || []).find(x => !x.kind || x.kind.startsWith('source.organizeImports'));
+    if (!a) return false;
+    await runAction(e[0], a);
+    return true;
+  }
+  /* Settings the servers read changed (e.g. Clippy for rust-analyzer): they ask for them again. */
+  const configChanged = () => clients.forEach(c => { if (c.state === 'ready') c.notify('workspace/didChangeConfiguration', {settings: {}}); });
   /* Quick fixes are run through one command, so edits that need resolving or a server command work too. */
   async function runAction(key, a) {
     const c = clients.get(key); if (!c) return;
@@ -323,5 +337,5 @@ const LSP = (() => {
     const r = await call(model, 'textDocument/references', {...docParams(model, pos), context: {includeDeclaration: false}});
     return (r || []).map(l => ({path: toPath(l.uri), line: l.range.start.line + 1, col: l.range.start.character + 1, len: Math.max(1, l.range.end.character - l.range.start.character)}));
   }
-  return {toPath, attach, stopAll, status, hasClient, references, diags, client: key => clients.get(key), applyEdit: applyWorkspaceEdit, saved: path => clients.forEach(c => c.saved(path)), onChange: fn => { onChange = fn; }, SERVERS};
+  return {organizeImports, configChanged, toPath, attach, stopAll, status, hasClient, references, diags, client: key => clients.get(key), applyEdit: applyWorkspaceEdit, saved: path => clients.forEach(c => c.saved(path)), onChange: fn => { onChange = fn; }, SERVERS};
 })();

@@ -366,5 +366,18 @@
   "rt.rerunFailed": "Fehlgeschlagene erneut",
   "rt.rerun": "Erneut ausführen",
   "rt.failedRun": "Fehlgeschlagene Tests",
-  "ac.snippet": "Vorlage (Tab springt weiter)"
+  "ac.snippet": "Vorlage (Tab springt weiter)",
+  "set.onSave": "Beim Speichern",
+  "set.formatOnSave": "Code beim Speichern formatieren (Strg+S, nicht beim automatischen Speichern)",
+  "set.lintOnSave": "Linter nach dem Speichern ausführen (ESLint, Ruff)",
+  "set.useClippy": "Rust: mit Clippy prüfen statt mit cargo check",
+  "a.optimizeImports": "Imports optimieren",
+  "a.fixLint": "Linter-Probleme beheben",
+  "a.clippyFix": "Clippy-Vorschläge anwenden",
+  "fmt.missing": "{tool} ist nicht installiert — {cmd}",
+  "fmt.failed": "{tool}: {e}",
+  "fmt.importsDone": "Imports optimiert.",
+  "fmt.noImports": "Imports optimieren geht hier nur mit einem Sprachserver (für Python mit Ruff).",
+  "lint.fixAll": "Alle {source}-Probleme der Datei beheben",
+  "lint.fixed": "Linter-Korrekturen angewendet."
 }

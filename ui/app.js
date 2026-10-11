@@ -30,7 +30,7 @@ const STORE = 'code-studio';
 const THEMES = ['dark', 'light', 'github', 'github-dark'];
 const DEF = {keys: {}, autoHide: false, lang: 'auto', theme: 'dark', dock: true, dockTab: 'project', dockW: 320, bottom: false, bottomTab: 'terminal', bottomH: 260,
   fontSize: 14, tabSize: 4, wordWrap: false, minimap: true, whitespace: false, sticky: true, ligatures: true,
-  autoSave: true, singleClick: true, reopen: true, shell: '', spell: 'auto'};
+  autoSave: true, singleClick: true, reopen: true, shell: '', spell: 'auto', formatOnSave: false, lintOnSave: true, useClippy: false};
 let settings = {...DEF}, recentProjects = [], booted = false;
 const effectiveLang = () => settings.lang === 'auto' ? ((navigator.language || 'en').toLowerCase().startsWith('de') ? 'de' : 'en') : settings.lang;
 function saveState() {
@@ -352,6 +352,7 @@ async function saveFile(f) {
     f.mtime = await writeText(f.path, text);
     f.saved = id;
     LSP.saved(f.path); scheduleGit(600);
+    if (settings.lintOnSave) scheduleLint(f);
     return true;
   } catch (e) { toast(t('toast.saveFail', {e})); return false; }
 }
@@ -1168,6 +1169,77 @@ $('#gitAmend').addEventListener('change', renderGit);
 $('#gitCommitBtn').addEventListener('click', gitCommit);
 function showDockTab(tab) { settings.dock = true; settings.dockTab = tab; applyLayout(); }
 
+/* ================= Format on save & linters ================= */
+/* Formatting uses the project's tool (Rust: tools.rs — rustfmt, gofmt, Ruff/Black, Prettier, clang-format), else the
+   language server's or the editor's own formatter; on save only when you save (Ctrl+S), not on autosave. Linters
+   (ESLint, Ruff) run after saving and fill the Problems panel; rust-analyzer can check with Clippy (setting). */
+const toolNotes = new Set();   // missing tools already mentioned this session
+const shownEditor = model => groups.map(g => g.editor).find(e => e.getModel() === model);
+async function formatFile(f, quiet) {
+  if (!f || f.kind !== 'text' || !f.model) return false;
+  const model = f.model, v = model.getVersionId();
+  const r = await invoke('format_text', {path: f.path, text: model.getValue(), lang: model.getLanguageId()}).catch(e => ({status: 'failed', tool: '?', error: String(e)}));
+  if (model.isDisposed() || model.getVersionId() !== v) return false;
+  if (r.status === 'ok') { if (r.text !== model.getValue()) replaceText(model, r.text); return true; }
+  if (r.status === 'failed') { if (!quiet) toast(t('fmt.failed', {tool: r.tool, e: (r.error || '').split('\n')[0]})); return false; }
+  if (r.status === 'missing' && !toolNotes.has(r.tool)) { toolNotes.add(r.tool); toast(t('fmt.missing', {tool: r.tool, cmd: r.install})); }
+  // No tool: the language server's / built-in formatter, when the file is shown.
+  const ed = shownEditor(model), act = ed && ed.getAction('editor.action.formatDocument');
+  if (act && act.isSupported()) { await act.run(); return true; }
+  return false;
+}
+/* The whole text replaced as one undoable step; the cursor stays where it was. */
+function replaceText(model, text) {
+  const ed = shownEditor(model), sel = ed && ed.getSelections();
+  if (ed) { ed.pushUndoStop(); ed.executeEdits('format', [{range: model.getFullModelRange(), text}]); ed.pushUndoStop(); }
+  else model.pushEditOperations([], [{range: model.getFullModelRange(), text}], () => null);
+  if (ed && sel) ed.setSelections(sel.map(s => { const a = model.validatePosition(s.getStartPosition()), b = model.validatePosition(s.getEndPosition()); return new monaco.Selection(a.lineNumber, a.column, b.lineNumber, b.column); }));
+}
+const lintDiags = new Map(), lintTimers = new Map();   // path → problems from ESLint / Ruff
+const allDiags = () => { const m = new Map(); for (const [p, l] of LSP.diags) m.set(p, [...l]); for (const [p, l] of lintDiags) m.set(p, [...(m.get(p) || []), ...l]); return m; };
+function scheduleLint(f) { clearTimeout(lintTimers.get(f.path)); lintTimers.set(f.path, setTimeout(() => runLint(f), 300)); }
+async function runLint(f) {
+  if (!f.model || f.model.isDisposed()) return;
+  const list = await invoke('lint_file', {path: f.path, lang: f.model.getLanguageId()}).catch(() => null);
+  if (list == null || f.model.isDisposed()) return;   // no linter for this file
+  const ds = list.map(l => ({severity: l.severity, message: l.message, source: l.source, code: l.code, line: l.line, col: l.col, endLine: l.end_line, endCol: Math.max(l.end_col, l.col + 1), fixable: l.fixable}));
+  if (ds.length) lintDiags.set(f.path, ds); else lintDiags.delete(f.path);
+  monaco.editor.setModelMarkers(f.model, 'lint', ds.map(d => ({severity: d.severity === 1 ? monaco.MarkerSeverity.Error : monaco.MarkerSeverity.Warning,
+    message: d.message, source: d.source, code: d.code || undefined, startLineNumber: d.line, startColumn: d.col, endLineNumber: d.endLine, endColumn: d.endCol})));
+  renderProblems(); renderBottomTabs(); renderLspStatus();
+}
+/* The linter's own fixes for the whole file (ESLint --fix, Ruff --fix); the file is saved first and reloaded after. */
+async function lintFix(f, imports = false) {
+  if (!f || !f.model) return;
+  if (isDirty(f)) await saveFile(f);
+  try { await invoke('lint_fix', {path: f.path, lang: f.model.getLanguageId(), imports}); }
+  catch (e) { return toast(String(e)); }
+  await checkDisk(); scheduleLint(f);
+  toast(t(imports ? 'fmt.importsDone' : 'lint.fixed'));
+}
+async function optimizeImports() {
+  const f = curFile(); if (!f || !f.model) return;
+  if (await LSP.organizeImports(f.model).catch(() => false)) return toast(t('fmt.importsDone'));
+  if (f.model.getLanguageId() === 'python') return lintFix(f, true);
+  toast(t('fmt.noImports'));
+}
+/* Clippy's automatic fixes run in a tab (they change files on disk; open files reload). */
+function clippyFix() {
+  const c = runDetected.find(x => x.command.startsWith('cargo ')), cwd = c ? join(project.root, c.dir || '') : project.root;
+  runConfig({name: 'cargo clippy --fix', command: 'cargo clippy --fix --allow-dirty --allow-staged', cwd, key: 'tool:clippy'});
+}
+function registerLintActions() {
+  monaco.editor.registerCommand('codeStudio.lintFix', () => lintFix(curFile()));
+  monaco.languages.registerCodeActionProvider('*', {provideCodeActions(model, range, ctx) {
+    const mine = (ctx.markers || []).filter(m => m.source === 'eslint' || m.source === 'ruff');
+    const fixable = (lintDiags.get(toPathOf(model)) || []).some(d => d.fixable);
+    if (!mine.length || !fixable) return {actions: [], dispose() {}};
+    return {actions: [{title: t('lint.fixAll', {source: mine[0].source === 'ruff' ? 'Ruff' : 'ESLint'}), kind: 'quickfix', diagnostics: mine,
+      command: {id: 'codeStudio.lintFix', title: ''}}], dispose() {}};
+  }});
+}
+const toPathOf = model => { for (const f of files.values()) if (f.model === model) return f.path; return null; };
+
 /* ================= Built-in completion ================= */
 /* Without a language server the suggestion list still has the language's keywords, common snippets (Tab moves through
    the parts) and the words of open files of that language. With a server running, it gives the suggestions. */
@@ -1416,8 +1488,8 @@ function addOutputLinks(term) {
 /* ================= Problems (from language servers) ================= */
 function problemCount() {
   let e = 0, w = 0;
-  for (const list of LSP.diags.values()) for (const d of list) { if (d.severity === 1) e++; else if (d.severity === 2) w++; }
-  return {e, w, f: LSP.diags.size};
+  for (const list of allDiags().values()) for (const d of list) { if (d.severity === 1) e++; else if (d.severity === 2) w++; }
+  return {e, w, f: allDiags().size};
 }
 function renderProblems() {
   const box = $('#problemList'); if (!box) return;
@@ -1425,7 +1497,7 @@ function renderProblems() {
   $('#problemSum').textContent = pc.e + pc.w ? t('ui.problemsSum', {e: num(pc.e), w: num(pc.w), f: num(pc.f)}) : '';
   let html = '';
   const sev = ['', '#d7373f', '#e68619', '#378ef0', '#7f8c99'];
-  for (const [path, list] of [...LSP.diags].sort((a, b) => a[0].localeCompare(b[0]))) {
+  for (const [path, list] of [...allDiags()].sort((a, b) => a[0].localeCompare(b[0]))) {
     const shown = list.filter(d => d.severity <= 2); if (!shown.length) continue;
     html += `<div class="file-group">${fileIcon(path)}<span>${esc(baseName(path))}</span><small>${esc(relPath(dirName(path)))} · ${shown.length}</small></div>`;
     for (const d of shown.sort((a, b) => a.severity - b.severity || a.line - b.line))
@@ -1603,7 +1675,7 @@ const A = {
   run: () => runSelected(), runFile: () => runCurrentFile(), stopRun: () => stopRun(), editRunConfigs: () => editRunConfigs(),
   toggleAutoHide: () => { settings.autoHide = !settings.autoHide; applySettings(); },
   newProject, openFolder: async () => { const p = await invoke('pick_folder'); if (p) openProject(p); }, closeProject: () => closeProject(false),
-  newFile: () => newFile(), newFolder: () => newFolder(), saveAll: () => saveAll(), localHistory: () => localHistory(),
+  newFile: () => newFile(), newFolder: () => newFolder(), saveAll: async () => { if (settings.formatOnSave) for (const f of dirtyFiles()) await formatFile(f, true); return saveAll(); }, localHistory: () => localHistory(),
   closeTab: () => closeTab(curGroup(), curPath()), closeAllTabs: async () => { for (const g of [...groups]) await closeTabs(g, null); },
   undo: edCmd('undo'), redo: edCmd('redo'), duplicateLine: edCmd('editor.action.copyLinesDownAction'), deleteLine: edCmd('editor.action.deleteLines'),
   moveLineUp: edCmd('editor.action.moveLinesUpAction'), moveLineDown: edCmd('editor.action.moveLinesDownAction'),
@@ -1628,7 +1700,8 @@ const A = {
   recentFiles: recentFilesPopup, goToLine, back: () => navGo(-1), forward: () => navGo(1), selectInProject: () => selectInProject(),
   nextTab: () => cycleTab(1), prevTab: () => cycleTab(-1),
   goToDefinition: () => { const ed = curEditor(); if (!ed) return; if (!smart(ed)) return toast(t('toast.noDef')); edCmd('editor.action.revealDefinition')(); },
-  formatCode: () => { const ed = curEditor(); if (!ed) return; const s = ed.getSelection(); edCmd(s && !s.isEmpty() ? 'editor.action.formatSelection' : 'editor.action.formatDocument')(); },
+  formatCode: () => { const ed = curEditor(); if (!ed) return; const s = ed.getSelection(); if (s && !s.isEmpty()) return edCmd('editor.action.formatSelection')(); formatFile(curFile(), false); },
+  optimizeImports: () => optimizeImports(), fixLint: () => lintFix(curFile()), clippyFix: () => clippyFix(),
   commentLine: edCmd('editor.action.commentLine'), blockComment: edCmd('editor.action.blockComment'),
   renameSymbol: () => {
     if (document.activeElement && document.activeElement.closest('#tree') && tree.sel && tree.sel !== project.root) return renamePath(tree.sel);
@@ -1677,7 +1750,7 @@ const MENUS = [
   ['navigate', [['searchEverywhere', 'Shift Shift', null, true], ['goToFile', 'Ctrl+Shift+N'], ['goToSymbol', 'Ctrl+Alt+Shift+N'], ['findAction', 'Ctrl+Shift+A', null, false, ['F1']],
     ['recentFiles', 'Ctrl+E'], '-', ['goToLine', 'Ctrl+G'], ['back', 'Ctrl+Alt+ArrowLeft'], ['forward', 'Ctrl+Alt+ArrowRight'], '-',
     ['goToDefinition', 'Ctrl+B'], ['goToImplementation', 'Ctrl+Alt+B'], ['findUsages', 'Alt+F7'], ['selectInProject', 'Alt+F1'], '-', ['nextTab', 'Alt+ArrowRight'], ['prevTab', 'Alt+ArrowLeft']]],
-  ['code', [['quickFix', 'Alt+Enter'], ['quickDoc', 'Ctrl+Q'], ['parameterInfo', 'Ctrl+P'], '-', ['formatCode', 'Ctrl+Alt+L'], ['commentLine', 'Ctrl+/'], ['blockComment', 'Ctrl+Shift+/', null, false, ['Ctrl+?']], '-', ['renameSymbol', 'Shift+F6'], '-',
+  ['code', [['quickFix', 'Alt+Enter'], ['quickDoc', 'Ctrl+Q'], ['parameterInfo', 'Ctrl+P'], '-', ['formatCode', 'Ctrl+Alt+L'], ['optimizeImports', 'Ctrl+Alt+O'], ['fixLint'], ['clippyFix'], ['commentLine', 'Ctrl+/'], ['blockComment', 'Ctrl+Shift+/', null, false, ['Ctrl+?']], '-', ['renameSymbol', 'Shift+F6'], '-',
     ['fold', 'Ctrl+-'], ['unfold', 'Ctrl+=', null, false, ['Ctrl++']], ['foldAll', 'Ctrl+Shift+-', null, false, ['Ctrl+_']], ['unfoldAll', 'Ctrl+Shift+=']]],
   ['git', [['gitCommit', 'Ctrl+K'], ['gitPush', 'Ctrl+Shift+K'], ['gitPull', 'Ctrl+T'], '-', ['gitBranches'], ['gitPanel', 'Alt+0'], ['gitRefresh']]],
   ['run', [['run', 'Shift+F10'], ['runFile', 'Ctrl+Shift+F10'], ['stopRun', 'Ctrl+F2'], '-', ['editRunConfigs']]],
@@ -1695,7 +1768,7 @@ function buildKeymap() {
   MENUS.forEach(([, items]) => items.forEach(it => { if (!Array.isArray(it)) return; if (it[1] && !it[3]) KEYMAP[it[1]] = it[0]; (it[4] || []).forEach(k => KEYMAP[k] = it[0]); }));
 }
 buildKeymap();
-const NEEDS_EDITOR = new Set(['runFile', 'undo', 'redo', 'duplicateLine', 'deleteLine', 'moveLineUp', 'moveLineDown', 'expandSelection', 'shrinkSelection', 'addNextOccurrence',
+const NEEDS_EDITOR = new Set(['optimizeImports', 'fixLint', 'runFile', 'undo', 'redo', 'duplicateLine', 'deleteLine', 'moveLineUp', 'moveLineDown', 'expandSelection', 'shrinkSelection', 'addNextOccurrence',
   'selectAllOccurrences', 'find', 'replace', 'goToLine', 'goToDefinition', 'goToImplementation', 'findUsages', 'quickFix', 'quickDoc', 'parameterInfo', 'formatCode', 'commentLine', 'blockComment', 'fold', 'unfold', 'foldAll', 'unfoldAll', 'localHistory']);
 const NO_PROJECT = new Set(['toggleAutoHide', 'newProject', 'openFolder', 'settings', 'langAuto', 'langEn', 'langDe', 'themeDark', 'themeLight', 'themeGithub', 'themeGithubDark',
   'shortcuts', 'about', 'togglePanels', 'hideAll', 'wordWrap', 'minimap', 'whitespace', 'findAction', 'searchEverywhere']);
@@ -1894,6 +1967,7 @@ function renderSettings() {
     editor: `<h3>${t('set.font')}</h3><select class="num-in" data-sel="fontSize">${[11, 12, 13, 14, 15, 16, 18, 20, 22, 24].map(n => opt(n, n + ' px', settings.fontSize)).join('')}</select>
       <h3>${t('set.tabSize')}</h3><select class="num-in" data-sel="tabSize">${[2, 4, 8].map(n => opt(n, n, settings.tabSize)).join('')}</select>
       <h3>${t('set.view')}</h3>${sw('wordWrap', t('a.wordWrap'))}${sw('minimap', t('a.minimap'))}${sw('whitespace', t('a.whitespace'))}${sw('sticky', t('set.sticky'))}${sw('ligatures', t('set.ligatures'))}
+      <h3>${t('set.onSave')}</h3>${sw('formatOnSave', t('set.formatOnSave'))}${sw('lintOnSave', t('set.lintOnSave'))}${sw('useClippy', t('set.useClippy'))}
       <h3>${t('set.spell')}</h3><p class="hint">${t('set.spellHint')}</p><select class="wide-sel" data-sel="spell">${opt('auto', t('set.spellAuto'), settings.spell)}${opt('de', 'Deutsch', settings.spell)}${opt('en', 'English', settings.spell)}${opt('off', t('set.spellOff'), settings.spell)}</select>`,
     terminal: `<h3>${t('set.shell')}</h3><p class="hint">${t('set.shellHint')}</p><input class="field-in wide-sel" data-text="shell" value="${esc(settings.shell)}" spellcheck="false">`
   };
@@ -1930,7 +2004,7 @@ function applyLanguage() {
   buildMenubar(); buildToolbars();
   if (booted) { renderRecent(); groups.forEach(fillEmptyHints); renderFind(); renderTodo(); buildStructure(); updateUI(); }
 }
-let lastSpell = null;
+let lastSpell = null, lastClippy = null;
 let appliedKeys = '{}';
 /* Settings → Shortcuts: change a key by pressing it (shortcuts.js). */
 function mountKeys() {
@@ -1938,6 +2012,7 @@ function mountKeys() {
     onChange: keys => { settings.keys = keys; applySettings(); }});
 }
 function applySettings() {
+  if (settings.useClippy !== lastClippy) { const first = lastClippy === null; lastClippy = settings.useClippy; if (!first) LSP.configChanged(); }
   if (window.AutoHide) AutoHide.set(settings.autoHide);
   if (window.Shortcuts && JSON.stringify(settings.keys || {}) !== appliedKeys) {
     appliedKeys = JSON.stringify(settings.keys || {});
@@ -2207,7 +2282,7 @@ function registerSpellActions() {
   applySettings();
   renderRecent(); renderFind(); renderTodo(); buildStructure(); renderTests();
   await monacoReady;
-  defineThemes(); registerSpellActions(); registerBuiltinCompletion();
+  defineThemes(); registerSpellActions(); registerBuiltinCompletion(); registerLintActions();
   monaco.editor.setTheme('studio-' + settings.theme);
   booted = true;
   let start = invoke ? await invoke('initial_path').catch(() => null) : null, file = null;
