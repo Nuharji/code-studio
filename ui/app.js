@@ -636,34 +636,8 @@ async function navGo(d) {
 async function jumpTo(path, line, col, len) { await openFile(path, {line, col, len}); }
 
 /* ================= Fuzzy matching ================= */
-/* Characters of the query in order; consecutive runs and word starts score higher. Returns {score, pos} or null. */
-function fuzzy(q, s) {
-  if (!q) return {score: 0, pos: []};
-  const ql = q.toLowerCase(), sl = s.toLowerCase(), pos = [];
-  let score = 0, j = 0, prev = -2;
-  const sub = sl.indexOf(ql);
-  if (sub >= 0) {
-    for (let k = 0; k < ql.length; k++) pos.push(sub + k);
-    return {score: 1000 - sub - s.length * 0.5 + (sub === 0 || /[\W_]/.test(s[sub - 1]) ? 200 : 0), pos};
-  }
-  for (let i = 0; i < sl.length && j < ql.length; i++) {
-    if (sl[i] !== ql[j]) continue;
-    const start = i === 0 || /[\W_]/.test(s[i - 1]) || (s[i] >= 'A' && s[i] <= 'Z' && s[i - 1] >= 'a' && s[i - 1] <= 'z');
-    score += (i === prev + 1 ? 15 : 0) + (start ? 25 : 0) + 1;
-    pos.push(i); prev = i; j++;
-  }
-  return j === ql.length ? {score: score - s.length * 0.5, pos} : null;
-}
+/* Matching and ranking happen in Rust (fuzzy.rs); results carry the matched character positions for highlighting. */
 const hl = (s, pos) => { if (!pos || !pos.length) return esc(s); const set = new Set(pos); return [...s].map((c, i) => set.has(i) ? `<b>${esc(c)}</b>` : esc(c)).join(''); };
-/* A path matches on its file name first, else on the whole relative path. */
-function matchPath(q, rel) {
-  const name = rel.slice(rel.lastIndexOf('/') + 1), m = fuzzy(q, name);
-  if (m) return {score: m.score + 500, name: hl(name, m.pos), dir: esc(rel.slice(0, rel.length - name.length).replace(/\/$/, ''))};
-  if (!q.includes('/') && q.length < 3) return null;
-  const p = fuzzy(q, rel); if (!p) return null;
-  const off = rel.length - name.length;
-  return {score: p.score, name: hl(name, p.pos.filter(i => i >= off).map(i => i - off)), dir: hl(rel.slice(0, Math.max(0, off - 1)), p.pos.filter(i => i < off - 1))};
-}
 async function getFileList() {
   if (!fileList && project) fileList = await invoke('walk_files', {root: project.root});
   return fileList || [];
@@ -717,36 +691,39 @@ async function searchEverywhere(tab = 'all', initial = '') {
   const files$ = async q => {
     const m = /^(.*?)(?::(\d+)(?::(\d+))?)?$/.exec(q), name = m[1], line = m[2] ? +m[2] : 0, col = m[3] ? +m[3] : 0;
     if (!name) return recentFiles.filter(x => x !== curPath()).slice(0, 15).map(x => ({kind: 'file', path: x, html: `${fileIcon(x)}<span class="nm">${esc(baseName(x))}</span><small>${esc(relPath(dirName(x)))}</small>`, line}));
-    const list = await getFileList(), out = [];
-    for (const r of list) { const mm = matchPath(name, r); if (mm) out.push({mm, r}); }
-    out.sort((a, b) => b.mm.score - a.mm.score || a.r.length - b.r.length);
-    return out.slice(0, 60).map(({mm, r}) => ({kind: 'file', path: absPath(r), line, col, html: `${fileIcon(r)}<span class="nm">${mm.name}</span><small>${mm.dir}</small>${line ? `<kbd>:${line}</kbd>` : ''}`}));
+    if (!project) return [];
+    await getFileList();   // makes sure Rust has the current file list
+    const hits = await invoke('fuzzy_files', {root: project.root, q: name, limit: 60});
+    return hits.map(h => ({kind: 'file', path: absPath(h.rel), line, col,
+      html: `${fileIcon(h.rel)}<span class="nm">${hl(h.name, h.name_pos)}</span><small>${hl(h.dir, h.dir_pos)}</small>${line ? `<kbd>:${line}</kbd>` : ''}`}));
   };
+  // Symbols of all open files; those of the current file rank a little higher.
   const syms$ = async q => {
-    const out = [];
+    const all = [];
     for (const f of files.values()) {
       if (f.kind !== 'text' || !f.model) continue;
-      for (const s of await loadSymbols(f)) {
-        const m = fuzzy(q, s.name); if (m) out.push({score: m.score + (f.path === curPath() ? 50 : 0), kind: 'sym', path: f.path, line: s.line,
-          html: `${symBadge(s.kind)}<span class="nm">${hl(s.name, m.pos)}</span><small>${esc(baseName(f.path))}:${s.line}</small>`});
-      }
+      for (const s of await loadSymbols(f)) all.push({f, s});
     }
-    return out.sort((a, b) => b.score - a.score).slice(0, 60);
+    const ranked = await invoke('fuzzy_rank', {q, items: all.map(x => x.s.name), bonus: all.map(x => x.f.path === curPath() ? 50 : 0), limit: 60});
+    return ranked.map(([i, pos]) => { const {f, s} = all[i]; return {kind: 'sym', path: f.path, line: s.line,
+      html: `${symBadge(s.kind)}<span class="nm">${hl(s.name, pos)}</span><small>${esc(baseName(f.path))}:${s.line}</small>`}; });
   };
-  const acts$ = q => Object.keys(A).filter(a => I18N.en['a.' + a]).map(a => ({a, m: fuzzy(q, t('a.' + a)) || (q ? null : {score: 0, pos: []})}))
-    .filter(x => x.m).sort((a, b) => b.m.score - a.m.score).slice(0, 40)
-    .map(({a, m}) => ({kind: 'act', act: a, html: `<span class="nm">${hl(t('a.' + a), m.pos)}</span><kbd>${esc(fmtKey(keyOf(a)))}</kbd>`, disabled: !allowed(a)}));
+  const acts$ = async q => {
+    const acts = Object.keys(A).filter(a => I18N.en['a.' + a]);
+    const ranked = await invoke('fuzzy_rank', {q, items: acts.map(a => t('a.' + a)), bonus: [], limit: 40});
+    return ranked.map(([i, pos]) => { const a = acts[i]; return {kind: 'act', act: a, html: `<span class="nm">${hl(t('a.' + a), pos)}</span><kbd>${esc(fmtKey(keyOf(a)))}</kbd>`, disabled: !allowed(a)}; });
+  };
   async function run() {
     const q = input.value.trim(), my = ++seq;
     let html = '';
     if (p.tab === 'all') {
-      const [fl, sy, ac] = [await files$(q), q ? await syms$(q) : [], q ? acts$(q) : []];
+      const [fl, sy, ac] = [await files$(q), q ? await syms$(q) : [], q ? await acts$(q) : []];
       if (my !== seq) return;
       items = [];
       const sect = (label, list) => { if (!list.length) return; html += `<div class="pp-sect">${esc(label)}</div>`; list.forEach(it => { html += item(it, items.length); items.push(it); }); };
       sect(q ? t('ui.files') : t('ui.recent'), fl.slice(0, q ? 8 : 15)); sect(t('ui.symbols'), sy.slice(0, 8)); sect(t('ui.actions'), ac.slice(0, 8));
     } else {
-      items = p.tab === 'files' ? await files$(q) : p.tab === 'symbols' ? await syms$(q) : acts$(q);
+      items = p.tab === 'files' ? await files$(q) : p.tab === 'symbols' ? await syms$(q) : await acts$(q);
       if (my !== seq) return;
       html = items.map((it, i) => item(it, i)).join('');
     }

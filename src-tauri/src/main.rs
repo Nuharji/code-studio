@@ -1,6 +1,7 @@
 // Hide the console window in release builds on Windows.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod fuzzy;
 mod lsp;
 mod symbols;
 mod terminal;
@@ -163,15 +164,18 @@ async fn delete_path(path: String) -> Result<(), String> {
 /* ================= Project search ================= */
 
 /// All files of the project (relative paths with /), respecting .gitignore.
+/// The list is also kept for fuzzy file search (fuzzy.rs).
 #[tauri::command]
-async fn walk_files(root: String) -> Vec<String> {
-    let root = PathBuf::from(root);
-    walker(&root)
+async fn walk_files(lists: State<'_, fuzzy::FileLists>, root: String) -> Result<Vec<String>, String> {
+    let dir = PathBuf::from(&root);
+    let list: Vec<String> = walker(&dir)
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_some_and(|t| t.is_file()))
-        .map(|e| rel(&root, e.path()))
+        .map(|e| rel(&dir, e.path()))
         .take(100_000)
-        .collect()
+        .collect();
+    lists.0.lock().unwrap().insert(root, std::sync::Arc::new(list.clone()));
+    Ok(list)
 }
 
 #[derive(Deserialize)]
@@ -512,9 +516,12 @@ fn main() {
         .manage(Initial(Mutex::new(initial)))
         .manage(terminal::Terminals::default())
         .manage(lsp::Servers::default())
+        .manage(fuzzy::FileLists::default())
         .invoke_handler(tauri::generate_handler![
             texts,
             symbols::symbols_of,
+            fuzzy::fuzzy_files,
+            fuzzy::fuzzy_rank,
             list_dir,
             read_file,
             stat_files,

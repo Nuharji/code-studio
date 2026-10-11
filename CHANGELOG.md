@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.6 — 2026-10-11
+- Search Everywhere: matching and ranking of files, symbols and actions now run in the Rust core (same results as before; the project file list no longer travels to the UI for every keystroke).
+
 ## 0.2.5 — 2026-10-11
 - Symbols (Structure panel, Go to Symbol, breadcrumb) are now found by the Rust core.
 - Fixed: the Structure panel of JSON files was always empty — it now lists the top two levels of keys.
