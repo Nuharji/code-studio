@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.5 — 2026-10-11
+- Symbols (Structure panel, Go to Symbol, breadcrumb) are now found by the Rust core.
+- Fixed: the Structure panel of JSON files was always empty — it now lists the top two levels of keys.
+- Fixed: Rust functions named `new` were missing from the Structure panel.
+- Fixed: HTML sections with an id now show it (e.g. `section#intro`).
+
 ## 0.2.4 — 2026-10-11
 - The English and German texts are now language files (src-tauri/i18n) delivered by the app's Rust core instead of being part of the JavaScript.
 

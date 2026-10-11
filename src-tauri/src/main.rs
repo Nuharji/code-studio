@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod lsp;
+mod symbols;
 mod terminal;
 
 use serde::{Deserialize, Serialize};
@@ -513,6 +514,7 @@ fn main() {
         .manage(lsp::Servers::default())
         .invoke_handler(tauri::generate_handler![
             texts,
+            symbols::symbols_of,
             list_dir,
             read_file,
             stat_files,

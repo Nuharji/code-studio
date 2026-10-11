@@ -530,13 +530,26 @@ async function deletePath(path) {
 async function afterFsChange(dir) { fileList = null; await loadDir(dir, true); renderTree(); scheduleTodo(); }
 
 /* ================= Structure, breadcrumb & status ================= */
-let symCache = {path: null, version: -1, list: []};
-function symbolsOf(f) {
-  if (!f || f.kind !== 'text') return [];
-  if (symCache.path === f.path && symCache.version === f.model.getVersionId()) return symCache.list;
-  const list = Symbols.of(f.model.getValue(), f.model.getLanguageId());
-  symCache = {path: f.path, version: f.model.getVersionId(), list};
+/* Symbols are found in Rust (symbols.rs) and kept per file until its text changes. */
+async function loadSymbols(f) {
+  const version = f.model.getVersionId();
+  if (f.syms && f.syms.version === version) return f.syms.list;
+  const list = await invoke('symbols_of', {text: f.model.getValue(), lang: f.model.getLanguageId()});
+  if (!f.syms || f.syms.version < version) f.syms = {version, list};
   return list;
+}
+/* The last known symbols right away; when the text has changed they are refreshed and the panel and breadcrumb redrawn. */
+let symPending = null;
+function symbolsOf(f) {
+  if (!f || f.kind !== 'text' || !f.model) return [];
+  if (!f.syms || f.syms.version !== f.model.getVersionId()) {
+    const key = f.path + '@' + f.model.getVersionId();
+    if (symPending !== key) {
+      symPending = key;
+      loadSymbols(f).then(() => { if (symPending === key) symPending = null; if (f === curFile()) { buildStructure(); renderCrumbs(); } }, () => {});
+    }
+  }
+  return f.syms ? f.syms.list : [];
 }
 const symBadge = k => { const [c, col] = Symbols.KIND[k] || ['·', '#7f8c99']; return `<span class="sym-k" style="background:${col}">${esc(c)}</span>`; };
 let structT;
@@ -709,11 +722,11 @@ async function searchEverywhere(tab = 'all', initial = '') {
     out.sort((a, b) => b.mm.score - a.mm.score || a.r.length - b.r.length);
     return out.slice(0, 60).map(({mm, r}) => ({kind: 'file', path: absPath(r), line, col, html: `${fileIcon(r)}<span class="nm">${mm.name}</span><small>${mm.dir}</small>${line ? `<kbd>:${line}</kbd>` : ''}`}));
   };
-  const syms$ = q => {
+  const syms$ = async q => {
     const out = [];
     for (const f of files.values()) {
-      if (f.kind !== 'text') continue;
-      for (const s of f.path === curPath() ? symbolsOf(f) : Symbols.of(f.model.getValue(), f.model.getLanguageId())) {
+      if (f.kind !== 'text' || !f.model) continue;
+      for (const s of await loadSymbols(f)) {
         const m = fuzzy(q, s.name); if (m) out.push({score: m.score + (f.path === curPath() ? 50 : 0), kind: 'sym', path: f.path, line: s.line,
           html: `${symBadge(s.kind)}<span class="nm">${hl(s.name, m.pos)}</span><small>${esc(baseName(f.path))}:${s.line}</small>`});
       }
@@ -727,13 +740,13 @@ async function searchEverywhere(tab = 'all', initial = '') {
     const q = input.value.trim(), my = ++seq;
     let html = '';
     if (p.tab === 'all') {
-      const [fl, sy, ac] = [await files$(q), q ? syms$(q) : [], q ? acts$(q) : []];
+      const [fl, sy, ac] = [await files$(q), q ? await syms$(q) : [], q ? acts$(q) : []];
       if (my !== seq) return;
       items = [];
       const sect = (label, list) => { if (!list.length) return; html += `<div class="pp-sect">${esc(label)}</div>`; list.forEach(it => { html += item(it, items.length); items.push(it); }); };
       sect(q ? t('ui.files') : t('ui.recent'), fl.slice(0, q ? 8 : 15)); sect(t('ui.symbols'), sy.slice(0, 8)); sect(t('ui.actions'), ac.slice(0, 8));
     } else {
-      items = p.tab === 'files' ? await files$(q) : p.tab === 'symbols' ? syms$(q) : acts$(q);
+      items = p.tab === 'files' ? await files$(q) : p.tab === 'symbols' ? await syms$(q) : acts$(q);
       if (my !== seq) return;
       html = items.map((it, i) => item(it, i)).join('');
     }
