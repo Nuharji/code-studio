@@ -348,5 +348,22 @@
   "git.branchName": "Branch name",
   "git.switched": "Branch: {b}",
   "git.fetch": "Fetch",
-  "git.branchTip": "Switch branch, push, pull"
+  "git.branchTip": "Switch branch, push, pull",
+  "rt.tab": "Tests",
+  "rt.runMain": "Run: {n}",
+  "rt.runTest": "Run test: {n}",
+  "rt.runSuite": "Run tests in {n}",
+  "rt.runNamed": "Run “{n}”",
+  "rt.saveConfig": "Save as Configuration",
+  "rt.copyCmd": "Copy Command",
+  "rt.saved": "Configuration “{n}” saved.",
+  "rt.allPassed": "All {p} tests passed ✓",
+  "rt.someFailed": "{f} test(s) failed, {p} passed",
+  "rt.failedCode": "Finished with code {c}",
+  "rt.none": "No tests run yet — click ▶ next to a test.",
+  "rt.noDetails": "No per-test results in the output (see the run tab).",
+  "rt.summary": "✓ {p} passed · ✗ {f} failed",
+  "rt.rerunFailed": "Rerun Failed",
+  "rt.rerun": "Rerun",
+  "rt.failedRun": "Failed tests"
 }

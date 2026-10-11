@@ -106,7 +106,7 @@ const editorOptions = () => ({
   stickyScroll: {enabled: settings.sticky}, lineNumbers: 'on', bracketPairColorization: {enabled: true}, guides: {bracketPairs: 'active', indentation: true},
   smoothScrolling: true, cursorBlinking: 'smooth', cursorSmoothCaretAnimation: 'on', automaticLayout: true, contextmenu: false, fixedOverflowWidgets: true,
   mouseWheelZoom: true, scrollBeyondLastLine: true, renderLineHighlight: 'all', padding: {top: 6}, multiCursorModifier: 'alt', linkedEditing: true,
-  'semanticHighlighting.enabled': true, theme: 'studio-' + settings.theme
+  'semanticHighlighting.enabled': true, theme: 'studio-' + settings.theme, glyphMargin: true
 });
 
 /* ================= Project ================= */
@@ -211,7 +211,11 @@ function makeGroup() {
   g.editor.onDidFocusEditorWidget(() => focusGroup(g));
   g.editor.onDidChangeCursorPosition(e => { if (g === focused) { updateStatus(); scheduleCrumbs(); } if (e.reason === 3 || e.source === 'api') return; });
   g.editor.onDidChangeCursorSelection(() => { if (g === focused) updateStatus(); });
-  g.editor.onDidChangeModelContent(() => { renderTabs(g); updateUI(); scheduleStructure(); scheduleSpell(g.editor.getModel()); scheduleGutter(files.get(g.active)); });
+  g.editor.onDidChangeModelContent(() => { renderTabs(g); updateUI(); scheduleStructure(); scheduleSpell(g.editor.getModel()); scheduleGutter(files.get(g.active)); scheduleRunnables(files.get(g.active)); });
+  g.editor.onMouseDown(e => {
+    if (e.target.type !== monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN || !e.event.leftButton) return;
+    const r = runnableAt(files.get(g.active), e.target.position.lineNumber); if (r) runRunnable(r);
+  });
   el.addEventListener('mousedown', () => focusGroup(g), true);
   fillEmptyHints(g);
   return g;
@@ -294,7 +298,7 @@ function setActive(g, path) {
   g.active = path;
   renderGroup(g);
   if (g === curGroup()) { updateUI(); buildStructure(); scheduleCrumbs(); }
-  const f = files.get(path); if (f && f.kind === 'text' && f.model) { scheduleSpell(f.model, 150); scheduleGutter(f, 150); }
+  const f = files.get(path); if (f && f.kind === 'text' && f.model) { scheduleSpell(f.model, 150); scheduleGutter(f, 150); scheduleRunnables(f, 100); }
 }
 function renderGroup(g) {
   const f = files.get(g.active);
@@ -983,7 +987,11 @@ async function newTerminal(cwd, run = null) {
   xterm.focus();
 }
 if (invoke) {
-  window.__TAURI__.event.listen('term-data', ev => { const tm = terms.find(x => x.id === ev.payload.id); if (tm) tm.xterm.write(ev.payload.data); });
+  window.__TAURI__.event.listen('term-data', ev => {
+    const tm = terms.find(x => x.id === ev.payload.id); if (!tm) return;
+    tm.xterm.write(ev.payload.data);
+    if (tm.test && tm.out.length < 4e6) tm.out += ev.payload.data;
+  });
   window.__TAURI__.event.listen('term-exit', ev => {
     const tm = terms.find(x => x.id === ev.payload); if (!tm) return;
     tm.exited = true; if (!tm.run) tm.xterm.writeln(`\r\n\x1b[90m[${t('ui.termExit')}]\x1b[0m`); renderBottomTabs();
@@ -994,6 +1002,7 @@ if (invoke) {
     const c = ev.payload.code;
     tm.code = c;
     if (tm.run.key.startsWith('git:')) scheduleGit(100);
+    if (tm.test) testsFinished(tm, c);
     tm.xterm.writeln(`\r\n\x1b[${c === 0 ? 32 : 31}m[${t('run.exited', {c: c == null ? '?' : c})}]\x1b[0m`);
   });
 }
@@ -1023,6 +1032,7 @@ function renderBottomTabs() {
   const pc = problemCount();
   const tabs = [`<button class="pt${settings.bottomTab === 'problems' ? ' active' : ''}" data-bt="problems">${esc(t('ui.problems'))}${pc.e + pc.w ? ` <span style="opacity:.7">${pc.e + pc.w}</span>` : ''}</button>`,
     `<button class="pt${settings.bottomTab === 'find' ? ' active' : ''}" data-bt="find">${esc(t('ui.find'))}</button>`,
+    `<button class="pt${settings.bottomTab === 'tests' ? ' active' : ''}" data-bt="tests">${esc(t('rt.tab'))}${lastTests && lastTests.results.length ? ` <span class="${lastTests.results.some(r => !r[1]) ? 'bad' : 'ok'}">${lastTests.results.filter(r => r[1]).length}/${lastTests.results.length}</span>` : ''}</button>`,
     ...terms.map(tm => `<button class="pt${settings.bottomTab === 'terminal' && tm === activeTerm ? ' active' : ''}" data-term="${tm.n}">${esc(termTitle(tm))}<span class="x" data-term-close="${tm.n}">&#10005;</span></button>`)];
   if (!terms.length) tabs.push(`<button class="pt${settings.bottomTab === 'terminal' ? ' active' : ''}" data-bt="terminal">${esc(t('ui.terminal'))}</button>`);
   $('#bottomTabs').innerHTML = tabs.join('');
@@ -1033,7 +1043,7 @@ function renderBottomTabs() {
 $('#bottomTabs').addEventListener('click', e => {
   const c = e.target.closest('[data-term-close]'); if (c) { closeTerminal(terms.find(x => x.n === +c.dataset.termClose)); if (!terms.length) settings.bottomTab = 'find'; applyLayout(); return; }
   const tb = e.target.closest('[data-term]'); if (tb) { activeTerm = terms.find(x => x.n === +tb.dataset.term); settings.bottomTab = 'terminal'; showBottom(); renderBottomTabs(); return; }
-  const b = e.target.closest('[data-bt]'); if (b) showBottom(b.dataset.bt);
+  const b = e.target.closest('[data-bt]'); if (b) showBottom(b.dataset.bt); if (b && b.dataset.bt === 'tests') renderTests();
 });
 
 /* ================= Git ================= */
@@ -1158,6 +1168,81 @@ $('#gitAmend').addEventListener('change', renderGit);
 $('#gitCommitBtn').addEventListener('click', gitCommit);
 function showDockTab(tab) { settings.dock = true; settings.dockTab = tab; applyLayout(); }
 
+/* ================= Run & test from the code ================= */
+/* A ▶ next to fn main, tests and test modules (Rust: runnables.rs finds them with the exact command); click runs just
+   that, right-click offers "save as configuration". After a test run the ▶ turns green or red and the Tests tab lists
+   the results (output read in Rust: test_results). */
+let testState = new Map(), lastTests = null;   // id → passed; {framework, cwd, run, results}
+const runTimers = new WeakMap();
+function scheduleRunnables(f, delay = 600) {
+  if (!f || !f.model || !invoke) return;
+  clearTimeout(runTimers.get(f)); runTimers.set(f, setTimeout(() => updateRunnables(f), delay));
+}
+async function updateRunnables(f) {
+  if (!f.model || f.model.isDisposed()) return;
+  const v = f.model.getVersionId();
+  const list = await invoke('runnables', {path: f.path, text: f.model.getValue(), lang: f.model.getLanguageId()}).catch(() => []);
+  if (f.model.isDisposed() || f.model.getVersionId() !== v) return;
+  f.runnables = list; drawRunnables(f);
+}
+function drawRunnables(f) {
+  if (!f.model || f.model.isDisposed()) return;
+  const deco = (f.runnables || []).map(r => {
+    const st = r.kind === 'suite' ? suiteState(r) : testState.get(r.id);
+    return {range: new monaco.Range(r.line, 1, r.line, 1), options: {glyphMarginClassName: 'run-glyph' + (st === true ? ' run-ok' : st === false ? ' run-fail' : ''),
+      glyphMarginHoverMessage: {value: t(r.kind === 'main' ? 'rt.runMain' : r.kind === 'suite' ? 'rt.runSuite' : 'rt.runTest', {n: r.name}) + '  \n`' + r.command + '`'}}};
+  });
+  f.runDeco = f.model.deltaDecorations(f.runDeco || [], deco);
+}
+// A module / class is green when all its known tests passed, red when one failed.
+function suiteState(r) {
+  let any = false;
+  for (const [id, ok] of testState) if (id.startsWith(r.id + '::') || id.startsWith(r.id + ' ')) { if (!ok) return false; any = true; }
+  return any ? true : undefined;
+}
+const runnableAt = (f, line) => f && (f.runnables || []).find(r => r.line === line);
+const frameworkOf = cmd => /^cargo test\b/.test(cmd) ? {framework: 'cargo'} : /pytest\b.*\s-v\b|pytest -v/.test(cmd) ? {framework: 'pytest'} : /^go test\b.*-v\b/.test(cmd) ? {framework: 'go'}
+  : /\bvitest\b/.test(cmd) ? {framework: 'vitest'} : /\bjest\b/.test(cmd) ? {framework: 'jest'} : /^node --test\b/.test(cmd) ? {framework: 'node'} : null;
+function runRunnable(r) {
+  runConfig({name: r.kind === 'main' ? r.name : (r.kind === 'suite' ? '⚑ ' : '') + r.name, command: r.command, cwd: r.cwd, key: 'rt:' + (r.id || r.command), framework: r.framework});
+}
+async function testsFinished(tm, code) {
+  const results = await invoke('test_results', {framework: tm.test.framework, output: tm.out}).catch(() => []);
+  for (const [id, ok] of results) testState.set(id, ok);
+  lastTests = {framework: tm.test.framework, cwd: tm.run.cwd, run: tm.run, results};
+  for (const f of files.values()) if (f.runnables) drawRunnables(f);
+  const pass = results.filter(r => r[1]).length, fail = results.length - pass;
+  if (results.length) toast(t(fail ? 'rt.someFailed' : 'rt.allPassed', {p: pass, f: fail}));
+  else if (code !== 0 && code != null) toast(t('rt.failedCode', {c: code}));
+  renderTests(); renderBottomTabs();
+}
+function renderTests() {
+  const box = $('#testList'); if (!box) return;
+  if (!lastTests) { box.innerHTML = `<div class="empty">${esc(t('rt.none'))}</div>`; $('#testSum').textContent = ''; return; }
+  const {results} = lastTests, fail = results.filter(r => !r[1]);
+  $('#testSum').innerHTML = `${esc(t('rt.summary', {p: results.length - fail.length, f: fail.length}))}${fail.length && canRerun() ? ` <button class="btn-sm" id="rerunFailed">${esc(t('rt.rerunFailed'))}</button>` : ''}
+    <button class="btn-sm" id="rerunAll">${esc(t('rt.rerun'))}</button>`;
+  box.innerHTML = results.length ? [...fail, ...results.filter(r => r[1])].map(([id, ok]) =>
+    `<div class="hit test-row" data-id="${esc(id)}"><b class="${ok ? 'ok' : 'bad'}">${ok ? '✓' : '✗'}</b> <span>${esc(id)}</span></div>`).join('')
+    : `<div class="empty">${esc(t('rt.noDetails'))}</div>`;
+}
+const canRerun = () => lastTests && ['cargo', 'pytest', 'go'].includes(lastTests.framework);
+function rerunFailed() {
+  const ids = lastTests.results.filter(r => !r[1]).map(r => r[0]), quoteAll = ids.map(i => '"' + i + '"').join(' ');
+  const cmd = {cargo: 'cargo test -- --exact ' + ids.join(' '), pytest: 'python -m pytest -v ' + quoteAll,
+    go: 'go test -v -run "^(' + ids.map(i => i.split('/')[0]).join('|') + ')$" .'}[lastTests.framework];
+  runConfig({name: t('rt.failedRun'), command: cmd, cwd: lastTests.cwd, key: 'rt:failed', framework: lastTests.framework});
+}
+$('#testSum').addEventListener('click', e => {
+  if (e.target.id === 'rerunFailed') rerunFailed();
+  if (e.target.id === 'rerunAll' && lastTests) runConfig({...lastTests.run, cwd: lastTests.cwd, framework: lastTests.framework});
+});
+// A result opens its test when the file is open.
+$('#testList').addEventListener('click', e => {
+  const row = e.target.closest('.test-row'); if (!row) return;
+  for (const f of files.values()) { const r = (f.runnables || []).find(x => x.id === row.dataset.id); if (r) return jumpTo(f.path, r.line, 1); }
+});
+
 /* ================= Run configurations ================= */
 /* What the project's build files offer (Rust: runconfig.rs), the user's own commands (kept with the project's session)
    and "run current file". Each configuration runs in its own tab of the bottom panel; running it again restarts it
@@ -1190,6 +1275,8 @@ $('#runSel').addEventListener('change', e => {
 });
 async function startRun(term, run, cwd) {
   term.run = {...run, cwd}; term.code = null;
+  // Test commands: the output is read for passed / failed per test.
+  term.test = run.framework && run.framework !== 'run' ? {framework: run.framework} : frameworkOf(run.command); term.out = '';
   term.xterm.writeln(`\x1b[90m${cwd}> ${run.command}\x1b[0m`);
   try { term.id = await invoke('term_start', {cwd, cols: term.xterm.cols, rows: term.xterm.rows, shell: null, run: run.command}); term.exited = false; }
   catch (e) { term.xterm.writeln(`\x1b[31m${t('toast.termFail', {e})}\x1b[0m`); term.exited = true; }
@@ -1198,7 +1285,7 @@ async function runConfig(c) {
   if (!project || !c || !invoke) return;
   if (dirtyFiles().length) await saveAll(true);   // like other IDEs: run what is in the editor
   const cwd = c.cwd || join(project.root, c.dir || ''), key = c.key || runKey(c);
-  const run = {key, name: c.name, command: c.command};
+  const run = {key, name: c.name, command: c.command, framework: c.framework};
   const term = terms.find(x => x.run && x.run.key === key);
   if (!term) return newTerminal(cwd, run);
   if (term.id != null && !term.exited) await invoke('term_kill', {id: term.id}).catch(() => {});
@@ -1839,6 +1926,9 @@ if (window.Native) {
         item('newTerminal'), {id: 'term:close', label: t('ctx.closeTerminal')}];
     }
     if (e.target.closest('.group-ed .ed-host') && curEditor()) {
+      const tg = curEditor().getTargetAtClientPoint(e.clientX, e.clientY);
+      const rn = tg && tg.type === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN && runnableAt(curFile(), tg.position.lineNumber);
+      if (rn) { ctx = {runnable: rn}; return [{id: 'rt:run', label: t('rt.runNamed', {n: rn.name})}, {id: 'rt:save', label: t('rt.saveConfig')}, null, {id: 'rt:copy', label: t('rt.copyCmd')}]; }
       const sp = spellMenu(e);
       const base = [{id: 'ed:cut', label: t('ctx.cut'), accel: 'Ctrl+X'}, {id: 'ed:copy', label: t('ctx.copy'), accel: 'Ctrl+C'}, {id: 'ed:paste', label: t('ctx.paste'), accel: 'Ctrl+V'}, null,
         item('goToDefinition'), item('findUsages'), item('renameSymbol'), item('quickFix'), null, item('formatCode'), item('commentLine'), null,
@@ -1859,6 +1949,16 @@ if (window.Native) {
   Native.setHandler(async id => {
     const [scope, what] = id.split(':');
     if (scope === 'git') return gitHandle(what, id.split(':')[2]);
+    if (scope === 'rt') {
+      const r = ctx.runnable; if (!r) return;
+      if (what === 'run') return runRunnable(r);
+      if (what === 'copy') return Native.clipboardWrite(r.command);
+      if (what === 'save') {
+        const dir = isUnder(r.cwd, project.root) ? r.cwd.slice(project.root.length).replace(/^[\\/]/, '') : '';
+        runState.custom = [...runState.custom.filter(c => c.name !== r.name), {name: r.name, command: r.command, dir}];
+        runState.selected = 'c:' + r.name; saveSession(); renderRunSel(); return toast(t('rt.saved', {n: r.name}));
+      }
+    }
     if (scope === 'sp') return spellAction(what, id.split(':')[2]);
     if (scope === 'tab') {
       const {g, path} = ctx;
@@ -2042,7 +2142,7 @@ function registerSpellActions() {
   if (invoke) I18N = await invoke('texts');
   applyLanguage();
   applySettings();
-  renderRecent(); renderFind(); renderTodo(); buildStructure();
+  renderRecent(); renderFind(); renderTodo(); buildStructure(); renderTests();
   await monacoReady;
   defineThemes(); registerSpellActions();
   monaco.editor.setTheme('studio-' + settings.theme);

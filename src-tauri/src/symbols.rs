@@ -103,7 +103,7 @@ fn rules_for(lang: &str) -> Option<&'static [Rule]> {
 }
 
 /// Blanks string and comment contents so braces in them don't confuse nesting (keeps the line structure).
-fn blank(text: &str, lang: &str) -> String {
+pub(crate) fn blank(text: &str, lang: &str) -> String {
     let hash = matches!(lang, "python" | "shell" | "yaml" | "toml" | "ruby" | "perl" | "r");
     let t: Vec<char> = text.chars().collect();
     let n = t.len();

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.0 — 2026-10-11
+- Run & test from the code: a ▶ next to the line numbers at `fn main`, every test and test module (Rust `#[test]`, Python `test_…` / test classes / `__main__`, Go `TestXxx` / `main`, JavaScript/TypeScript `test` / `it` / `describe` with Jest, Vitest or node:test). Click runs exactly that; right-click saves it as a run configuration or copies the command.
+- After a run the ▶ turns green or red (a module is green when all its tests passed). The new Tests tab in the bottom panel lists passed and failed tests (click one to jump to it), with “Rerun failed” for cargo, pytest and go and “Rerun”. Test commands from run configurations are read the same way.
+
 ## 0.7.0 — 2026-10-11
 - Git (stage 3b), through the installed git: a Git panel (Alt+0) lists changed files — tick a file to stage it — with the commit message below (Ctrl+Enter or Ctrl+K commits; “Amend last commit”). Click a file for the differences since the last commit; right-click to stage/unstage, open or discard changes.
 - The status bar shows the branch with ↑ commits to push and ↓ to pull; click it to switch branches, create one, pull, push or fetch. Push (Ctrl+Shift+K) and pull (Ctrl+T) run in a bottom-panel tab, so prompts and messages are visible.

@@ -103,6 +103,12 @@ svg.i{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stro
 .git-gutter{width:3px!important;margin-left:4px}.git-added{background:#59a869}.git-modified{background:#3d8ee8}
 .git-deleted{border-bottom:3px solid #d7373f;height:0!important;width:8px!important;margin-top:-1px}
 .modal.gitdiff{width:min(1200px,96vw);height:min(760px,90vh)}.modal.gitdiff .modal-body{padding:0;overflow:hidden}.git-diff-host{width:100%;height:100%;min-height:60vh}
+.run-glyph{cursor:pointer}.run-glyph::before{content:"";display:block;margin:4px auto 0;width:0;height:0;border-left:8px solid #59a869;border-top:5px solid transparent;border-bottom:5px solid transparent;opacity:.85}
+.run-glyph:hover::before{opacity:1}.run-glyph.run-ok::before{border-left-color:#3fb950}.run-glyph.run-fail::before{border-left-color:#e5484d}
+.run-glyph.run-ok::after,.run-glyph.run-fail::after{content:"";position:absolute;right:1px;bottom:3px;width:5px;height:5px;border-radius:50%;background:#3fb950}
+.run-glyph.run-fail::after{background:#e5484d}
+.test-row b.ok,.pt .ok{color:#3fb950}.test-row b.bad,.pt .bad{color:#e5484d}.test-row{cursor:pointer}
+#testSum .btn-sm{margin-left:8px}
 .run-box{gap:4px}.run-sel{max-width:220px;height:26px;background:var(--input-bg,var(--chrome2));color:var(--text);border:1px solid var(--border);border-radius:4px;padding:0 6px;font:inherit}
 .run-box #runBtns{display:flex;gap:1px}
 .rc-row{display:grid;grid-template-columns:1fr 2fr 1fr auto;gap:6px;margin-bottom:6px}
@@ -411,6 +417,7 @@ select:focus,input:focus{border-color:var(--accent)}
         <button class="ibtn" data-act="toggleBottom" data-tip="a.hidePanel"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button></div>
       <div class="panel-body">
         <div class="ppanel" data-pp="problems"><div class="find-sum" id="problemSum"></div><div id="problemList" style="flex:1;overflow:auto"></div></div>
+        <div class="ppanel" data-pp="tests"><div class="find-sum" id="testSum"></div><div id="testList" style="flex:1;overflow:auto"></div></div>
         <div class="ppanel" data-pp="find"><div class="find-sum" id="findSum"></div><div id="findList" style="flex:1;overflow:auto"></div></div>
         <div class="ppanel" data-pp="terminal"><div id="terms" style="position:absolute;inset:0"></div></div>
       </div>

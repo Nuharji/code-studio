@@ -6,6 +6,7 @@ mod fuzzy;
 mod git;
 mod lsp;
 mod runconfig;
+mod runnables;
 mod spell;
 mod symbols;
 mod terminal;
@@ -528,6 +529,8 @@ fn main() {
             fuzzy::fuzzy_rank,
             codespell::code_spell,
             runconfig::run_configs,
+            runnables::runnables,
+            runnables::test_results,
             git::git_status,
             git::git_head_text,
             git::git_line_changes,
