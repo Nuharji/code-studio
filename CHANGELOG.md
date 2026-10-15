@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.10.1 — 2026-10-15
+- App icon with a picture of what the app does, like Slides and Plan Studio; the window and taskbar icon is now the same picture.
+
 ## 0.10.0 — 2026-10-11
 - Format on save (Settings → Editor → On save): Ctrl+S formats changed files with the project’s own tool — rustfmt (with the crate’s edition), gofmt, Ruff or Black, Prettier (when the project or PATH has it), clang-format — using your config files; otherwise the language server’s or the editor’s formatter. Autosave doesn’t format, so nothing jumps while you type. Code → Reformat Code (Ctrl+Alt+L) uses the same tools.
 - Linters: after saving, ESLint (the project’s) and Ruff results appear as squiggles and in the Problems panel, with “Fix all … problems in the file” as a quick fix (Code → Fix Linter Problems). For Rust, rust-analyzer can check with Clippy instead of cargo check (setting); Code → Apply Clippy Fixes runs `cargo clippy --fix`.
