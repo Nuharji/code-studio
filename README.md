@@ -1,5 +1,7 @@
 # Code Studio
 
+> **Status: Pre-Alpha, on hold** — early version (0.x); development is paused for now. Things may still change or break.
+
 The IDE of the Studio family (Rust / Tauri 2) — works like a JetBrains IDE (Search Everywhere, Go to File/Symbol,
 JetBrains shortcuts, project tree, Find in Files, terminal, local history) and looks like Markdown, PDF and Data Studio.
 
