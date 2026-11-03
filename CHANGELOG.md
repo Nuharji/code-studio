@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.10.2 — 2026-11-03
+- Fix (macOS): the app no longer asks again and again for access to your Documents folder (or Desktop, Downloads). The app is now signed as a whole, so macOS can remember your answer. After an update, macOS may ask once more.
+
 ## 0.10.1 — 2026-10-15
 - App icon with a picture of what the app does, like Slides and Plan Studio; the window and taskbar icon is now the same picture.
 
