@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.0 — 2026-11-12
+- Live templates like in JetBrains IDEs (P-006): type an abbreviation and press Tab — `fn`, `test`, `tmod`, `if`, `for`, `match`, `log` (println! / print / console.log …), `ifmain`, `iferr`, `psvm`, `html5`, `table` … — then Tab moves through the parts to fill in. They also appear in the suggestions, now even while a language server is running. Sets for Rust, Python, JavaScript/TypeScript, Go, C/C++, C#, Java, Shell, Lua, Ruby, PHP, Markdown and HTML.
+- Postfix completion: after an expression type a dot and the template — `value.if` → `if value { }`, `x.dbg` → `dbg!(x)`, `items.for` → loop, `done.not`, `name.log` → `console.log(name)`, `user.nn` → null check, `expr.return`, `.let` / `.const` / `.var` … (Rust uses rust-analyzer’s own postfix suggestions when it runs).
+- Code → Surround With… (Ctrl+Alt+T): puts the selection — or the current line — into if / for / try / a block / a function, a Markdown code block or bold, an HTML tag …; 1–9 picks directly.
+- Settings → Templates (also Code → Live Templates…): switch templates on and off, change the built-in ones (undo the changes any time) and add your own for any language — or for every language. Export them as a small JSON file and import it on another PC.
+
 ## 0.10.2 — 2026-11-03
 - Fix (macOS): the app no longer asks again and again for access to your Documents folder (or Desktop, Downloads). The app is now signed as a whole, so macOS can remember your answer. After an update, macOS may ask once more.
 

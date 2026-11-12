@@ -9,6 +9,7 @@ mod runconfig;
 mod runnables;
 mod spell;
 mod symbols;
+mod templates;
 mod terminal;
 mod tools;
 
@@ -410,6 +411,12 @@ async fn pick_file(app: AppHandle) -> Option<String> {
     app.dialog().file().blocking_pick_file().and_then(|f| f.into_path().ok()).map(|p| path_str(&p))
 }
 
+/// Where to save a file (export); `name` is the suggested file name.
+#[tauri::command]
+async fn pick_save_file(app: AppHandle, name: String) -> Option<String> {
+    app.dialog().file().set_file_name(name).blocking_save_file().and_then(|f| f.into_path().ok()).map(|p| path_str(&p))
+}
+
 #[tauri::command]
 fn reveal(app: AppHandle, path: String) -> Result<(), String> {
     app.opener().reveal_item_in_dir(path).map_err(|e| e.to_string())
@@ -563,6 +570,15 @@ fn main() {
             history_read,
             pick_folder,
             pick_file,
+            pick_save_file,
+            templates::templates_list,
+            templates::template_save,
+            templates::template_delete,
+            templates::template_enable,
+            templates::templates_export,
+            templates::templates_import,
+            templates::template_postfix,
+            templates::template_fill,
             reveal,
             confirm,
             open_url,

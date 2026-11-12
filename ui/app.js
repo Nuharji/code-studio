@@ -106,7 +106,7 @@ const editorOptions = () => ({
   stickyScroll: {enabled: settings.sticky}, lineNumbers: 'on', bracketPairColorization: {enabled: true}, guides: {bracketPairs: 'active', indentation: true},
   smoothScrolling: true, cursorBlinking: 'smooth', cursorSmoothCaretAnimation: 'on', automaticLayout: true, contextmenu: false, fixedOverflowWidgets: true,
   mouseWheelZoom: true, scrollBeyondLastLine: true, renderLineHighlight: 'all', padding: {top: 6}, multiCursorModifier: 'alt', linkedEditing: true,
-  'semanticHighlighting.enabled': true, theme: 'studio-' + settings.theme, glyphMargin: true
+  'semanticHighlighting.enabled': true, tabCompletion: 'on', theme: 'studio-' + settings.theme, glyphMargin: true
 });
 
 /* ================= Project ================= */
@@ -1241,8 +1241,8 @@ function registerLintActions() {
 const toPathOf = model => { for (const f of files.values()) if (f.model === model) return f.path; return null; };
 
 /* ================= Built-in completion ================= */
-/* Without a language server the suggestion list still has the language's keywords, common snippets (Tab moves through
-   the parts) and the words of open files of that language. With a server running, it gives the suggestions. */
+/* Without a language server the suggestion list still has the language's keywords and the words of open files of that
+   language. With a server running, it gives the suggestions. Live templates (fn, test, if …) come from templates.js. */
 const KW = s => s.split(' ');
 const KEYWORDS = {
   rust: KW('as async await break const continue crate dyn else enum extern false fn for if impl in let loop match mod move mut pub ref return self Self static struct super trait true type unsafe use where while Some None Ok Err Option Result Vec String Box println format vec'),
@@ -1260,33 +1260,14 @@ const KEYWORDS = {
   kotlin: KW('as break class continue do else false for fun if in interface is null object package return super this throw true try typealias val var when while data sealed override private public internal suspend println'),
   swift: KW('associatedtype class deinit enum extension func import init inout internal let operator private protocol public static struct subscript typealias var break case continue default defer do else fallthrough for guard if in repeat return switch where while as false is nil self Self super throw throws true try print')
 };
-const SNIPPETS = {
-  rust: [['fn', 'fn ${1:name}(${2}) {\n\t$0\n}'], ['test', '#[test]\nfn ${1:name}() {\n\t$0\n}'], ['if', 'if ${1:condition} {\n\t$0\n}'], ['for', 'for ${1:item} in ${2:iter} {\n\t$0\n}'],
-    ['match', 'match ${1:value} {\n\t${2:_} => $0,\n}'], ['struct', 'struct ${1:Name} {\n\t$0\n}'], ['impl', 'impl ${1:Name} {\n\t$0\n}'], ['println', 'println!("${1:{\\}}"${2:, value});']],
-  python: [['def', 'def ${1:name}(${2}):\n\t${0:pass}'], ['class', 'class ${1:Name}:\n\tdef __init__(self${2}):\n\t\t${0:pass}'], ['if', 'if ${1:condition}:\n\t${0:pass}'],
-    ['for', 'for ${1:item} in ${2:items}:\n\t${0:pass}'], ['with', 'with ${1:open(path)} as ${2:f}:\n\t${0:pass}'], ['try', 'try:\n\t${1:pass}\nexcept ${2:Exception} as e:\n\t${0:raise}'],
-    ['ifmain', 'if __name__ == "__main__":\n\t${0:main()}']],
-  go: [['func', 'func ${1:name}(${2}) ${3}{\n\t$0\n}'], ['iferr', 'if err != nil {\n\treturn ${1:err}\n}'], ['for', 'for ${1:i} := 0; $1 < ${2:n}; $1++ {\n\t$0\n}'],
-    ['forr', 'for ${1:_}, ${2:v} := range ${3:items} {\n\t$0\n}'], ['test', 'func Test${1:Name}(t *testing.T) {\n\t$0\n}'], ['main', 'func main() {\n\t$0\n}']],
-  c: [['main', 'int main(void) {\n\t$0\n\treturn 0;\n}'], ['for', 'for (int ${1:i} = 0; $1 < ${2:n}; $1++) {\n\t$0\n}'], ['if', 'if (${1:condition}) {\n\t$0\n}'], ['inc', '#include <${1:stdio.h}>']],
-  cpp: [['main', 'int main() {\n\t$0\n\treturn 0;\n}'], ['for', 'for (int ${1:i} = 0; $1 < ${2:n}; ++$1) {\n\t$0\n}'], ['forr', 'for (auto& ${1:item} : ${2:items}) {\n\t$0\n}'], ['class', 'class ${1:Name} {\npublic:\n\t$0\n};']],
-  csharp: [['class', 'public class ${1:Name}\n{\n\t$0\n}'], ['prop', 'public ${1:int} ${2:Name} { get; set; }'], ['foreach', 'foreach (var ${1:item} in ${2:items})\n{\n\t$0\n}'], ['cw', 'Console.WriteLine(${1});']],
-  java: [['main', 'public static void main(String[] args) {\n\t$0\n}'], ['sout', 'System.out.println(${1});'], ['for', 'for (int ${1:i} = 0; $1 < ${2:n}; $1++) {\n\t$0\n}'], ['class', 'public class ${1:Name} {\n\t$0\n}']],
-  shell: [['if', 'if [ ${1:condition} ]; then\n\t$0\nfi'], ['for', 'for ${1:item} in ${2:list}; do\n\t$0\ndone'], ['func', '${1:name}() {\n\t$0\n}'], ['shebang', '#!/usr/bin/env bash\nset -euo pipefail\n$0']],
-  lua: [['function', 'function ${1:name}(${2})\n\t$0\nend'], ['for', 'for ${1:i} = 1, ${2:n} do\n\t$0\nend'], ['forp', 'for ${1:k}, ${2:v} in pairs(${3:t}) do\n\t$0\nend'], ['if', 'if ${1:condition} then\n\t$0\nend']],
-  ruby: [['def', 'def ${1:name}\n\t$0\nend'], ['class', 'class ${1:Name}\n\t$0\nend'], ['each', '${1:items}.each do |${2:item}|\n\t$0\nend']],
-  php: [['function', 'function ${1:name}(${2})\n{\n\t$0\n}'], ['class', 'class ${1:Name}\n{\n\t$0\n}'], ['foreach', 'foreach (\\$${1:items} as \\$${2:item}) {\n\t$0\n}']]
-};
 function registerBuiltinCompletion() {
-  const K = monaco.languages.CompletionItemKind, SNIP = monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet;
-  const langs = new Set([...Object.keys(KEYWORDS), ...Object.keys(SNIPPETS), 'yaml', 'ini', 'markdown', 'plaintext', 'dockerfile', 'powershell', 'perl', 'r', 'scala', 'dart', 'elixir']);
+  const K = monaco.languages.CompletionItemKind;
+  const langs = new Set([...Object.keys(KEYWORDS), 'yaml', 'ini', 'markdown', 'plaintext', 'dockerfile', 'powershell', 'perl', 'r', 'scala', 'dart', 'elixir']);
   for (const lang of langs) {
     monaco.languages.registerCompletionItemProvider(lang, {provideCompletionItems(model, pos) {
       if (LSP.hasClient(lang)) return {suggestions: []};
       const w = model.getWordUntilPosition(pos), range = new monaco.Range(pos.lineNumber, w.startColumn, pos.lineNumber, w.endColumn), seen = new Set();
       const out = [];
-      for (const [label, body] of SNIPPETS[lang] || []) out.push({label, kind: K.Snippet, insertText: body, insertTextRules: SNIP, range, detail: t('ac.snippet'), sortText: '1' + label,
-        documentation: {value: '```\n' + body.replace(/\$\{\d+:?([^}]*)\}/g, '$1').replace(/\$\d/g, '') + '\n```'}});
       for (const k of KEYWORDS[lang] || []) if (!seen.has(k)) { seen.add(k); out.push({label: k, kind: K.Keyword, insertText: k, range, sortText: '2' + k}); }
       // Words of the open files of this language (not the one being typed).
       const typing = w.word;
@@ -1709,6 +1690,7 @@ const A = {
     if (!smart(ed)) return toast(t('toast.noDef'));
     edCmd('editor.action.rename')();
   },
+  surroundWith: () => Templates.surround(), editTemplates: () => { prefsSection = 'templates'; openSettings(); },
   findUsages, quickFix: edCmd('editor.action.quickFix'), quickDoc: edCmd('editor.action.showHover'), parameterInfo: edCmd('editor.action.triggerParameterHints'),
   goToImplementation: () => { const ed = curEditor(); if (!ed) return; if (!LSP.hasClient(ed.getModel().getLanguageId())) return toast(t('toast.noDef')); edCmd('editor.action.goToImplementation')(); },
   toggleProblems: toggleBottomTab('problems'),
@@ -1750,7 +1732,7 @@ const MENUS = [
   ['navigate', [['searchEverywhere', 'Shift Shift', null, true], ['goToFile', 'Ctrl+Shift+N'], ['goToSymbol', 'Ctrl+Alt+Shift+N'], ['findAction', 'Ctrl+Shift+A', null, false, ['F1']],
     ['recentFiles', 'Ctrl+E'], '-', ['goToLine', 'Ctrl+G'], ['back', 'Ctrl+Alt+ArrowLeft'], ['forward', 'Ctrl+Alt+ArrowRight'], '-',
     ['goToDefinition', 'Ctrl+B'], ['goToImplementation', 'Ctrl+Alt+B'], ['findUsages', 'Alt+F7'], ['selectInProject', 'Alt+F1'], '-', ['nextTab', 'Alt+ArrowRight'], ['prevTab', 'Alt+ArrowLeft']]],
-  ['code', [['quickFix', 'Alt+Enter'], ['quickDoc', 'Ctrl+Q'], ['parameterInfo', 'Ctrl+P'], '-', ['formatCode', 'Ctrl+Alt+L'], ['optimizeImports', 'Ctrl+Alt+O'], ['fixLint'], ['clippyFix'], ['commentLine', 'Ctrl+/'], ['blockComment', 'Ctrl+Shift+/', null, false, ['Ctrl+?']], '-', ['renameSymbol', 'Shift+F6'], '-',
+  ['code', [['quickFix', 'Alt+Enter'], ['quickDoc', 'Ctrl+Q'], ['parameterInfo', 'Ctrl+P'], '-', ['surroundWith', 'Ctrl+Alt+T'], ['editTemplates'], '-', ['formatCode', 'Ctrl+Alt+L'], ['optimizeImports', 'Ctrl+Alt+O'], ['fixLint'], ['clippyFix'], ['commentLine', 'Ctrl+/'], ['blockComment', 'Ctrl+Shift+/', null, false, ['Ctrl+?']], '-', ['renameSymbol', 'Shift+F6'], '-',
     ['fold', 'Ctrl+-'], ['unfold', 'Ctrl+=', null, false, ['Ctrl++']], ['foldAll', 'Ctrl+Shift+-', null, false, ['Ctrl+_']], ['unfoldAll', 'Ctrl+Shift+=']]],
   ['git', [['gitCommit', 'Ctrl+K'], ['gitPush', 'Ctrl+Shift+K'], ['gitPull', 'Ctrl+T'], '-', ['gitBranches'], ['gitPanel', 'Alt+0'], ['gitRefresh']]],
   ['run', [['run', 'Shift+F10'], ['runFile', 'Ctrl+Shift+F10'], ['stopRun', 'Ctrl+F2'], '-', ['editRunConfigs']]],
@@ -1768,9 +1750,9 @@ function buildKeymap() {
   MENUS.forEach(([, items]) => items.forEach(it => { if (!Array.isArray(it)) return; if (it[1] && !it[3]) KEYMAP[it[1]] = it[0]; (it[4] || []).forEach(k => KEYMAP[k] = it[0]); }));
 }
 buildKeymap();
-const NEEDS_EDITOR = new Set(['optimizeImports', 'fixLint', 'runFile', 'undo', 'redo', 'duplicateLine', 'deleteLine', 'moveLineUp', 'moveLineDown', 'expandSelection', 'shrinkSelection', 'addNextOccurrence',
+const NEEDS_EDITOR = new Set(['surroundWith', 'optimizeImports', 'fixLint', 'runFile', 'undo', 'redo', 'duplicateLine', 'deleteLine', 'moveLineUp', 'moveLineDown', 'expandSelection', 'shrinkSelection', 'addNextOccurrence',
   'selectAllOccurrences', 'find', 'replace', 'goToLine', 'goToDefinition', 'goToImplementation', 'findUsages', 'quickFix', 'quickDoc', 'parameterInfo', 'formatCode', 'commentLine', 'blockComment', 'fold', 'unfold', 'foldAll', 'unfoldAll', 'localHistory']);
-const NO_PROJECT = new Set(['toggleAutoHide', 'newProject', 'openFolder', 'settings', 'langAuto', 'langEn', 'langDe', 'themeDark', 'themeLight', 'themeGithub', 'themeGithubDark',
+const NO_PROJECT = new Set(['editTemplates', 'toggleAutoHide', 'newProject', 'openFolder', 'settings', 'langAuto', 'langEn', 'langDe', 'themeDark', 'themeLight', 'themeGithub', 'themeGithubDark',
   'shortcuts', 'about', 'togglePanels', 'hideAll', 'wordWrap', 'minimap', 'whitespace', 'findAction', 'searchEverywhere']);
 function allowed(act) {
   if (NO_PROJECT.has(act)) return true;
@@ -1969,12 +1951,14 @@ function renderSettings() {
       <h3>${t('set.view')}</h3>${sw('wordWrap', t('a.wordWrap'))}${sw('minimap', t('a.minimap'))}${sw('whitespace', t('a.whitespace'))}${sw('sticky', t('set.sticky'))}${sw('ligatures', t('set.ligatures'))}
       <h3>${t('set.onSave')}</h3>${sw('formatOnSave', t('set.formatOnSave'))}${sw('lintOnSave', t('set.lintOnSave'))}${sw('useClippy', t('set.useClippy'))}
       <h3>${t('set.spell')}</h3><p class="hint">${t('set.spellHint')}</p><select class="wide-sel" data-sel="spell">${opt('auto', t('set.spellAuto'), settings.spell)}${opt('de', 'Deutsch', settings.spell)}${opt('en', 'English', settings.spell)}${opt('off', t('set.spellOff'), settings.spell)}</select>`,
+    templates: `<div id="tplBox"></div>`,
     terminal: `<h3>${t('set.shell')}</h3><p class="hint">${t('set.shellHint')}</p><input class="field-in wide-sel" data-text="shell" value="${esc(settings.shell)}" spellcheck="false">`
   };
   $('#modalTitle').textContent = t('set.title');
   $('#modalBody').innerHTML = `<div class="prefs"><nav>${Object.keys(body).filter(k => k !== 'keys').concat('keys').map(k =>
     `<button data-sec="${k}" class="${k === prefsSection ? 'active' : ''}">${esc(t('set.' + k))}</button>`).join('')}</nav><section>${body[prefsSection]}</section></div>`;
   if (prefsSection === 'keys') mountKeys();
+  if (prefsSection === 'templates') Templates.editor($('#tplBox'));
   $('#modalFoot').hidden = false;
   $('#modalFoot').innerHTML = `<button class="btn-sm" data-pref="reset">${esc(t('set.reset'))}</button><span class="flex"></span>
     <button class="btn-sm primary" data-pref="done">${esc(t('set.done'))}</button>`;
@@ -2002,7 +1986,7 @@ function applyLanguage() {
   $$('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
   $$('[data-i18n-ph]').forEach(el => el.placeholder = t(el.dataset.i18nPh));
   buildMenubar(); buildToolbars();
-  if (booted) { renderRecent(); groups.forEach(fillEmptyHints); renderFind(); renderTodo(); buildStructure(); updateUI(); }
+  if (booted) { Templates.load(); renderRecent(); groups.forEach(fillEmptyHints); renderFind(); renderTodo(); buildStructure(); updateUI(); }
 }
 let lastSpell = null, lastClippy = null;
 let appliedKeys = '{}';
@@ -2283,6 +2267,7 @@ function registerSpellActions() {
   renderRecent(); renderFind(); renderTodo(); buildStructure(); renderTests();
   await monacoReady;
   defineThemes(); registerSpellActions(); registerBuiltinCompletion(); registerLintActions();
+  await Templates.load(); Templates.register();
   monaco.editor.setTheme('studio-' + settings.theme);
   booted = true;
   let start = invoke ? await invoke('initial_path').catch(() => null) : null, file = null;

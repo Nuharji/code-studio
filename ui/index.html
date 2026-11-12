@@ -342,6 +342,15 @@ select:focus,input:focus{border-color:var(--accent)}
 .prefs h3{font-size:12px;font-weight:600;color:var(--strong);margin:20px 0 8px}
 .prefs .hint{color:var(--dim);margin:-2px 0 10px}
 .wide-sel{width:280px}
+.tpl-bar{display:flex;align-items:center;gap:6px;margin:8px 0}.tpl-bar .flex{flex:1}.tpl-bar select{width:180px}.tpl-bar input{width:180px}
+.tpl-list{border:1px solid var(--border);border-radius:var(--radius);max-height:52vh;overflow:auto}
+.tpl-row{display:grid;grid-template-columns:20px 110px 80px 1fr auto;align-items:center;gap:8px;padding:5px 10px;cursor:pointer;border-bottom:1px solid var(--border)}
+.tpl-row:last-child{border-bottom:0}.tpl-row:hover{background:var(--hover)}.tpl-row.off{opacity:.5}
+.tpl-row kbd{font-family:var(--font-code);justify-self:start}.tpl-row small{color:var(--dim)}.tpl-desc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tpl-kind{font-size:11px;color:var(--dim)}.tpl-kind.k-postfix{color:#56b6c2}.tpl-kind.k-surround{color:#e5a54b}
+.tpl-form{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 12px}.tpl-form .tpl-wide{grid-column:1/-1}.tpl-form .field-in{display:block;margin-top:4px}
+.tpl-body{height:180px;padding:6px 8px;font-family:var(--font-code);tab-size:4;resize:vertical;white-space:pre}
+.tpl-note{color:var(--dim);margin:6px 0}.tpl-note.err{color:#d7373f}.tpl-num{min-width:14px;text-align:center}
 .num-in{width:80px}
 .switch{display:flex;align-items:center;gap:10px;margin:10px 0;cursor:pointer}
 .switch input{display:none}
@@ -479,6 +488,7 @@ select:focus,input:focus{border-color:var(--accent)}
 <script src="shortcuts.js"></script>
 <script src="symbols.js"></script>
 <script src="lsp.js"></script>
+<script src="templates.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
