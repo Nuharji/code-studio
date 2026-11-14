@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.12.0 — 2026-11-14
+What the other Studio apps got meanwhile, now in Code Studio too:
+- Shared settings with all Studio apps: theme and language follow Studio Hub and the other apps (and changes here go to them); folder dialogs and “New Project” start in the shared work folder.
+- Eleven more themes: CLI (Terminal) in green, amber, cyan, magenta and white, Midnight, Dusk, Graphite, High contrast, Sand and Rosé — also for the editor and the terminal. Settings → Appearance now shows the themes in three columns; Settings menu → Theme lists them all.
+- Layouts next to the themes (Settings → Appearance → Layout): Adobe (as before), Custom (panels and tool rail left or right, density, corners, floating panels, status bar, font), Modern, CLI, Focus and Mirrored. With the panels on the left, their resize handle moves to their right edge.
+- Theme and layout per app: “Like Studio Hub” (default) or “Only for this app”.
+- Send to Agent Studio… (Code menu, right-click in the editor or the project tree): the open file, the selection or a folder goes with a task — explain, review, fix the problems the editor shows, write tests, document, or your own — to Agent Studio; Claude works in the project folder there, and the files it changed open here from the card in the corner.
+- MCP server (`code-studio --mcp`, see README): project overview, files, Find in Files, symbols, runnables and formatting for Claude, ChatGPT and other MCP clients — read only.
+- Not yet: the 3D layout (“3D (Beta)”, a workbench) — it is a separate to-do.
+
 ## 0.11.0 — 2026-11-12
 - Live templates like in JetBrains IDEs (P-006): type an abbreviation and press Tab — `fn`, `test`, `tmod`, `if`, `for`, `match`, `log` (println! / print / console.log …), `ifmain`, `iferr`, `psvm`, `html5`, `table` … — then Tab moves through the parts to fill in. They also appear in the suggestions, now even while a language server is running. Sets for Rust, Python, JavaScript/TypeScript, Go, C/C++, C#, Java, Shell, Lua, Ruby, PHP, Markdown and HTML.
 - Postfix completion: after an expression type a dot and the template — `value.if` → `if value { }`, `x.dbg` → `dbg!(x)`, `items.for` → loop, `done.not`, `name.log` → `console.log(name)`, `user.nn` → null check, `expr.return`, `.let` / `.const` / `.var` … (Rust uses rust-analyzer’s own postfix suggestions when it runs).

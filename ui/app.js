@@ -27,7 +27,9 @@ const fmtKey = k => {
 
 /* ================= Settings & state ================= */
 const STORE = 'code-studio';
-const THEMES = ['dark', 'light', 'github', 'github-dark'];
+const THEMES = ['dark', 'light', 'github', 'github-dark', 'cli', 'cli-amber', 'cli-cyan', 'cli-magenta', 'cli-white', 'midnight', 'dusk', 'graphite', 'contrast', 'sand', 'rose'];
+/* Menu action of a theme: 'github-dark' → themeGithubDark (the same names as in the other Studio apps). */
+const themeAct = th => 'theme' + th.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join('');
 const DEF = {keys: {}, autoHide: false, lang: 'auto', theme: 'dark', dock: true, dockTab: 'project', dockW: 320, bottom: false, bottomTab: 'terminal', bottomH: 260,
   fontSize: 14, tabSize: 4, wordWrap: false, minimap: true, whitespace: false, sticky: true, ligatures: true,
   autoSave: true, singleClick: true, reopen: true, shell: '', spell: 'auto', formatOnSave: false, lintOnSave: true, useClippy: false};
@@ -75,12 +77,28 @@ function defineThemes() {
     dark: ['vs-dark', '#1e1e1e', '#262626', '#f5922e', '#3a2a1a'], light: ['vs', '#ffffff', '#f5f5f5', '#c25a00', '#fde3c8'],
     github: ['vs', '#ffffff', '#f6f8fa', '#0969da', '#ddf4ff'], 'github-dark': ['vs-dark', '#0d1117', '#151b23', '#4493f8', '#1f2a3a']
   };
-  for (const [k, [base, bg, line, accent, sel]] of Object.entries(T)) monaco.editor.defineTheme('studio-' + k, {
+  // The newer themes take their colors from the CSS of the theme (index.html), read from a hidden probe element.
+  const probe = document.createElement('div'); probe.hidden = true; document.body.append(probe);
+  const pen = document.createElement('canvas').getContext('2d');
+  const hex = c => { pen.fillStyle = '#000'; pen.fillStyle = c; return /^#[0-9a-f]{6}$/i.test(pen.fillStyle) ? pen.fillStyle : null; };
+  const mixHex = (a, b, w) => { const x = [1, 3, 5].map(i => parseInt(a.substr(i, 2), 16)), y = [1, 3, 5].map(i => parseInt(b.substr(i, 2), 16));
+    return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * w).toString(16).padStart(2, '0')).join(''); };
+  const fg = {};
+  for (const th of THEMES.filter(x => !T[x])) {
+    probe.dataset.theme = th;
+    const cs = getComputedStyle(probe), v = n => hex(cs.getPropertyValue(n).trim());
+    const bg = v('--editor-bg'), accent = v('--accent'), dark = cs.colorScheme.trim() === 'dark';
+    if (!bg || !accent) continue;
+    T[th] = [th === 'contrast' ? 'hc-black' : dark ? 'vs-dark' : 'vs', bg, mixHex(bg, v('--hover') || bg, .6), accent, mixHex(bg, accent, .25), v('--modal-bg') || bg];
+    fg[th] = v('--text');
+  }
+  probe.remove();
+  for (const [k, [base, bg, line, accent, sel, widget]] of Object.entries(T)) monaco.editor.defineTheme('studio-' + k, {
     base, inherit: true, rules: [],
     colors: {'editor.background': bg, 'editorGutter.background': bg, 'minimap.background': bg, 'editor.lineHighlightBackground': line,
       'editor.lineHighlightBorder': line, 'editorCursor.foreground': accent, 'editorLineNumber.activeForeground': accent,
-      'editor.selectionHighlightBackground': sel + '99', 'editorWidget.background': base === 'vs' ? '#f8f8f8' : bg === '#1e1e1e' ? '#2c2c2c' : '#151b23',
-      'stickyScroll.background': bg, 'editorStickyScrollHover.background': line}
+      'editor.selectionHighlightBackground': sel + '99', 'editorWidget.background': widget || (base === 'vs' ? '#f8f8f8' : bg === '#1e1e1e' ? '#2c2c2c' : '#151b23'),
+      'stickyScroll.background': bg, 'editorStickyScrollHover.background': line, ...(fg[k] ? {'editor.foreground': fg[k]} : {})}
   });
 }
 let EXT_LANG = null;
@@ -958,9 +976,9 @@ $('#todoList').addEventListener('click', e => { const el = e.target.closest('[da
 /* ================= Terminal ================= */
 let terms = [], activeTerm = null, termSeq = 0;
 function termTheme() {
-  const dark = settings.theme === 'dark' || settings.theme === 'github-dark';
+  const dark = getComputedStyle(document.documentElement).colorScheme.trim() === 'dark';
   return {background: cssVar('--panel'), foreground: cssVar('--text'), cursor: cssVar('--accent'), cursorAccent: cssVar('--panel'),
-    selectionBackground: dark ? 'rgba(245,146,46,.35)' : 'rgba(232,113,10,.25)',
+    selectionBackground: cssVar('--sel-strong') || (dark ? 'rgba(245,146,46,.35)' : 'rgba(232,113,10,.25)'),
     ...(dark ? {} : {black: '#1f2328', brightBlack: '#57606a', white: '#6e7781', brightWhite: '#8c959f', yellow: '#9a6700', brightYellow: '#bf8700'})};
 }
 async function newTerminal(cwd, run = null) {
@@ -1583,7 +1601,7 @@ const TEMPLATES = {
 };
 function newProject() {
   let tpl = 'rust';
-  const last = recentProjects[0] ? dirName(recentProjects[0].path) : '';
+  const last = recentProjects[0] ? dirName(recentProjects[0].path) : (window.Shared && Shared.values.workFolder) || '';
   modal(t('a.newProject').replace('…', ''), `<label class="lbl">${esc(t('ui.template'))}</label><div class="tpl-grid">${Object.entries(TEMPLATES).map(([k, v]) =>
     `<button class="tpl${k === tpl ? ' active' : ''}" data-tpl="${k}"><span class="fi" style="background:${v.col};width:26px;height:26px;font-size:10px">${esc(v.icon)}</span><span><b>${esc(t('tpl.' + k))}</b><small>${esc(t('tpl.' + k + 'D'))}</small></span></button>`).join('')}</div>
     <label class="lbl">${esc(t('ui.name'))}</label><input class="field-in" id="npName" value="my-project" spellcheck="false">
@@ -1699,7 +1717,8 @@ const A = {
   collapseTree: () => { tree.expanded = new Set([project.root]); renderTree(); saveSession(); }, refreshTodo,
   settings: () => openSettings(),
   langAuto: () => setPref('lang', 'auto'), langEn: () => setPref('lang', 'en'), langDe: () => setPref('lang', 'de'),
-  themeDark: () => setPref('theme', 'dark'), themeLight: () => setPref('theme', 'light'), themeGithub: () => setPref('theme', 'github'), themeGithubDark: () => setPref('theme', 'github-dark'),
+  ...Object.fromEntries(THEMES.map(th => [themeAct(th), () => setPref('theme', th)])),
+  sendToAgent: () => sendToAgent(),
   shortcuts: () => {
     let h = '';
     MENUS.forEach(([m, items]) => {
@@ -1732,15 +1751,13 @@ const MENUS = [
   ['navigate', [['searchEverywhere', 'Shift Shift', null, true], ['goToFile', 'Ctrl+Shift+N'], ['goToSymbol', 'Ctrl+Alt+Shift+N'], ['findAction', 'Ctrl+Shift+A', null, false, ['F1']],
     ['recentFiles', 'Ctrl+E'], '-', ['goToLine', 'Ctrl+G'], ['back', 'Ctrl+Alt+ArrowLeft'], ['forward', 'Ctrl+Alt+ArrowRight'], '-',
     ['goToDefinition', 'Ctrl+B'], ['goToImplementation', 'Ctrl+Alt+B'], ['findUsages', 'Alt+F7'], ['selectInProject', 'Alt+F1'], '-', ['nextTab', 'Alt+ArrowRight'], ['prevTab', 'Alt+ArrowLeft']]],
-  ['code', [['quickFix', 'Alt+Enter'], ['quickDoc', 'Ctrl+Q'], ['parameterInfo', 'Ctrl+P'], '-', ['surroundWith', 'Ctrl+Alt+T'], ['editTemplates'], '-', ['formatCode', 'Ctrl+Alt+L'], ['optimizeImports', 'Ctrl+Alt+O'], ['fixLint'], ['clippyFix'], ['commentLine', 'Ctrl+/'], ['blockComment', 'Ctrl+Shift+/', null, false, ['Ctrl+?']], '-', ['renameSymbol', 'Shift+F6'], '-',
+  ['code', [['quickFix', 'Alt+Enter'], ['quickDoc', 'Ctrl+Q'], ['parameterInfo', 'Ctrl+P'], '-', ['surroundWith', 'Ctrl+Alt+T'], ['editTemplates'], '-', ['formatCode', 'Ctrl+Alt+L'], ['optimizeImports', 'Ctrl+Alt+O'], ['fixLint'], ['clippyFix'], ['commentLine', 'Ctrl+/'], ['blockComment', 'Ctrl+Shift+/', null, false, ['Ctrl+?']], '-', ['renameSymbol', 'Shift+F6'], '-', ['sendToAgent'], '-',
     ['fold', 'Ctrl+-'], ['unfold', 'Ctrl+=', null, false, ['Ctrl++']], ['foldAll', 'Ctrl+Shift+-', null, false, ['Ctrl+_']], ['unfoldAll', 'Ctrl+Shift+=']]],
   ['git', [['gitCommit', 'Ctrl+K'], ['gitPush', 'Ctrl+Shift+K'], ['gitPull', 'Ctrl+T'], '-', ['gitBranches'], ['gitPanel', 'Alt+0'], ['gitRefresh']]],
   ['run', [['run', 'Shift+F10'], ['runFile', 'Ctrl+Shift+F10'], ['stopRun', 'Ctrl+F2'], '-', ['editRunConfigs']]],
   ['settings', [['settings', 'Ctrl+Alt+S'], '-', '#menu.language',
     ['langAuto', null, () => settings.lang === 'auto'], ['langEn', null, () => settings.lang === 'en'], ['langDe', null, () => settings.lang === 'de'],
-    '-', '#menu.theme',
-    ['themeDark', null, () => settings.theme === 'dark'], ['themeLight', null, () => settings.theme === 'light'],
-    ['themeGithub', null, () => settings.theme === 'github'], ['themeGithubDark', null, () => settings.theme === 'github-dark']]],
+    '-', '#menu.theme', ...THEMES.map(th => [themeAct(th), null, () => settings.theme === th])]],
   ['help', [['shortcuts'], '-', ['about']]]
 ];
 const KEYMAP = {};
@@ -1752,7 +1769,7 @@ function buildKeymap() {
 buildKeymap();
 const NEEDS_EDITOR = new Set(['surroundWith', 'optimizeImports', 'fixLint', 'runFile', 'undo', 'redo', 'duplicateLine', 'deleteLine', 'moveLineUp', 'moveLineDown', 'expandSelection', 'shrinkSelection', 'addNextOccurrence',
   'selectAllOccurrences', 'find', 'replace', 'goToLine', 'goToDefinition', 'goToImplementation', 'findUsages', 'quickFix', 'quickDoc', 'parameterInfo', 'formatCode', 'commentLine', 'blockComment', 'fold', 'unfold', 'foldAll', 'unfoldAll', 'localHistory']);
-const NO_PROJECT = new Set(['editTemplates', 'toggleAutoHide', 'newProject', 'openFolder', 'settings', 'langAuto', 'langEn', 'langDe', 'themeDark', 'themeLight', 'themeGithub', 'themeGithubDark',
+const NO_PROJECT = new Set(['editTemplates', 'toggleAutoHide', 'newProject', 'openFolder', 'settings', 'langAuto', 'langEn', 'langDe', ...THEMES.map(themeAct),
   'shortcuts', 'about', 'togglePanels', 'hideAll', 'wordWrap', 'minimap', 'whitespace', 'findAction', 'searchEverywhere']);
 function allowed(act) {
   if (NO_PROJECT.has(act)) return true;
@@ -1895,7 +1912,10 @@ function dragSize(handle, onMove) {
     handle.addEventListener('pointerup', () => { handle.removeEventListener('pointermove', move); handle.classList.remove('drag'); applyLayout(); }, {once: true});
   });
 }
-dragSize($('#dockSplit'), ev => { settings.dockW = Math.round(Math.min(window.innerWidth * 0.5, Math.max(200, window.innerWidth - ev.clientX))); document.documentElement.style.setProperty('--dock-w', settings.dockW + 'px'); });
+dragSize($('#dockSplit'), ev => {
+  // The panels sit on the right, or on the left with the layouts Eigenes / Gespiegelt (shared.js, layouts.css).
+  const left = document.documentElement.dataset.lDock === 'left', r = $('#dock').getBoundingClientRect();
+  settings.dockW = Math.round(Math.min(window.innerWidth * 0.5, Math.max(200, left ? ev.clientX - r.left : r.right - ev.clientX))); document.documentElement.style.setProperty('--dock-w', settings.dockW + 'px'); });
 dragSize($('#bottomSplit'), ev => { const r = $('.center').getBoundingClientRect(); settings.bottomH = Math.round(Math.min(r.height - 120, Math.max(100, r.bottom - ev.clientY))); document.documentElement.style.setProperty('--bottom-h', settings.bottomH + 'px'); fitTerms(); });
 
 /* ================= Modal, toast, confirm ================= */
@@ -1943,9 +1963,10 @@ function renderSettings() {
       <select class="wide-sel" data-sel="lang">${opt('auto', t('a.langAuto'), settings.lang)}${opt('en', 'English', settings.lang)}${opt('de', 'Deutsch', settings.lang)}</select>
       <h3>${t('set.startup')}</h3>${sw('reopen', t('set.reopen'))}${sw('autoSave', t('set.autoSave'))}${sw('singleClick', t('set.singleClick'))}
       <h3>${t('set.layout')}</h3>${sw('autoHide', t('set.autoHide'))}`,
-    appearance: `<h3>${t('set.theme')}</h3><div class="theme-grid">` + THEMES.map(th =>
+    appearance: (window.Shared ? Shared.scopePicker() : '') + `<h3>${t('set.theme')}</h3><div class="theme-grid">` + THEMES.map(th =>
       `<button class="theme-card${settings.theme === th ? ' active' : ''}" data-theme-pick="${th}">${mock(th)}
-       <div class="theme-name">${esc(t('theme.' + th))}<span>${settings.theme === th ? '&#10003;' : ''}</span></div></button>`).join('') + `</div>`,
+       <div class="theme-name">${esc(t('theme.' + th))}<span>${settings.theme === th ? '&#10003;' : ''}</span></div></button>`).join('') + `</div>` +
+      (window.Shared ? Shared.layoutHeading() : ''),
     editor: `<h3>${t('set.font')}</h3><select class="num-in" data-sel="fontSize">${[11, 12, 13, 14, 15, 16, 18, 20, 22, 24].map(n => opt(n, n + ' px', settings.fontSize)).join('')}</select>
       <h3>${t('set.tabSize')}</h3><select class="num-in" data-sel="tabSize">${[2, 4, 8].map(n => opt(n, n, settings.tabSize)).join('')}</select>
       <h3>${t('set.view')}</h3>${sw('wordWrap', t('a.wordWrap'))}${sw('minimap', t('a.minimap'))}${sw('whitespace', t('a.whitespace'))}${sw('sticky', t('set.sticky'))}${sw('ligatures', t('set.ligatures'))}
@@ -2005,6 +2026,8 @@ function applySettings() {
   }
   if (settings.spell !== lastSpell) { const first = lastSpell === null; lastSpell = settings.spell; if (!first && window.monaco) spellRerun(); }
   if (!THEMES.includes(settings.theme)) settings.theme = 'dark';
+  // Theme and language are shared by all Studio apps (shared.js): a change here goes to the others too.
+  if (window.Shared) Shared.push({theme: settings.theme, lang: settings.lang});
   const nl = effectiveLang();
   if (nl !== lang) { lang = nl; applyLanguage(); }
   document.documentElement.dataset.theme = settings.theme;
@@ -2018,6 +2041,28 @@ function applySettings() {
   applyLayout();
   if (booted) syncDisabled();
   saveState();
+}
+
+/* ================= Send to Agent Studio (agentlink.js) ================= */
+/* The open file (with the selection and its problems) — or a file / folder from the project tree — goes with a task
+   to Agent Studio; Claude works in the project folder there, and changed files open here from the card in the corner. */
+function sendToAgent(o = {}) {
+  if (!window.AgentLink) return;
+  if (!project) return toast(t('toast.needProject'));
+  const f = o.dir ? null : o.path ? files.get(o.path) : curFile(), path = o.dir ? null : o.path || (f && f.path);
+  const ed = !o.path && !o.dir ? curEditor() : null, model = f && f.kind === 'text' ? f.model : null;
+  const sel = ed && ed.getSelection() && !ed.getSelection().isEmpty() ? model.getValueInRange(ed.getSelection()) : '';
+  const problems = model ? monaco.editor.getModelMarkers({resource: model.uri}).filter(m => m.owner !== 'spell' && m.severity >= monaco.MarkerSeverity.Warning)
+    .slice(0, 40).map(m => `${relPath(path)}:${m.startLineNumber}:${m.startColumn} ${m.message}`) : [];
+  const what = o.dir ? relPath(o.dir) || baseName(project.root) : path ? relPath(path) : baseName(project.root);
+  const presets = [
+    {label: t('agent.explain'), task: t(sel ? 'agent.explainSelTask' : 'agent.explainTask', {name: what}), level: 'read'},
+    {label: t('agent.review'), task: t('agent.reviewTask', {name: what}), level: 'read'},
+    ...(problems.length ? [{label: t('agent.problems'), task: t('agent.problemsTask', {name: what}) + '\n\n' + problems.join('\n'), level: 'edit'}] : []),
+    {label: t('agent.tests'), task: t('agent.testsTask', {name: what}), level: 'edit'},
+    {label: t('agent.docs'), task: t('agent.docsTask', {name: what}), level: 'edit'}];
+  AgentLink.send({title: what, dir: o.dir || project.root, files: path ? [path] : [], selection: sel,
+    content: model && isDirty(f) && model.getValueLength() < 400000 ? model.getValue() : '', presets});
 }
 
 /* ================= Native right-click menus (see native.js) ================= */
@@ -2038,7 +2083,8 @@ if (window.Native) {
       return [{id: 'tree:newFile', label: t('a.newFile')}, {id: 'tree:newFolder', label: t('a.newFolder')}, null,
         {id: 'tree:rename', label: t('ui.rename') + '…', accel: 'Shift+F6', enabled: !row.root}, {id: 'tree:delete', label: t('ctx.delete'), accel: 'Delete', enabled: !row.root}, null,
         {id: 'tree:copyPath', label: t('a.copyPath')}, {id: 'tree:copyRel', label: t('a.copyRelPath')}, {id: 'tree:reveal', label: t(IS_MAC ? 'ctx.revealMac' : 'ctx.reveal')}, null,
-        {id: 'tree:terminal', label: t('ctx.openTerminal')}, {id: 'tree:find', label: t('ctx.findInFolder')}, ...(row.dir ? [] : [null, {id: 'tree:history', label: t('a.localHistory')}])];
+        {id: 'tree:terminal', label: t('ctx.openTerminal')}, {id: 'tree:find', label: t('ctx.findInFolder')}, ...(row.dir ? [] : [null, {id: 'tree:history', label: t('a.localHistory')}]),
+        null, {id: 'tree:agent', label: t('a.sendToAgent')}];
     }
     if (e.target.closest('[data-panel="project"]')) { if (!project) return null; ctx = {path: project.root, dir: true}; return [{id: 'tree:newFile', label: t('a.newFile')}, {id: 'tree:newFolder', label: t('a.newFolder')}]; }
     const term = e.target.closest('.term-host');
@@ -2054,7 +2100,7 @@ if (window.Native) {
       const sp = spellMenu(e);
       const base = [{id: 'ed:cut', label: t('ctx.cut'), accel: 'Ctrl+X'}, {id: 'ed:copy', label: t('ctx.copy'), accel: 'Ctrl+C'}, {id: 'ed:paste', label: t('ctx.paste'), accel: 'Ctrl+V'}, null,
         item('goToDefinition'), item('findUsages'), item('renameSymbol'), item('quickFix'), null, item('formatCode'), item('commentLine'), null,
-        item('find'), item('findInFiles'), null, item('localHistory'), item('selectInProject'), item('copyPath')];
+        item('find'), item('findInFiles'), null, item('localHistory'), item('selectInProject'), item('copyPath'), null, item('sendToAgent')];
       return sp ? sp.then(items => [...items, null, ...base]) : base;
     }
     const gr = e.target.closest('.git-row');
@@ -2095,6 +2141,7 @@ if (window.Native) {
     if (scope === 'tree') {
       const {path, dir} = ctx, folder = dir ? path : dirName(path);
       if (what === 'newFile') return newFile(folder);
+      if (what === 'agent') return sendToAgent(dir ? {dir: path} : {path});
       if (what === 'newFolder') return newFolder(folder);
       if (what === 'rename') return renamePath(path);
       if (what === 'delete') return deletePath(path);
@@ -2262,6 +2309,13 @@ function registerSpellActions() {
 /* ================= Boot ================= */
 (async function boot() {
   if (invoke) I18N = await invoke('texts');
+  // Theme, layout and language shared by all Studio apps (shared.js); the shared values win over this app's own.
+  if (window.Shared) await Shared.init({app: 'cd', apply: sh => {
+    if (sh.theme && THEMES.includes(sh.theme)) settings.theme = sh.theme;
+    if (sh.lang) settings.lang = sh.lang;
+    if (booted) applySettings();
+  }});
+  lang = effectiveLang();
   applyLanguage();
   applySettings();
   renderRecent(); renderFind(); renderTodo(); buildStructure(); renderTests();
@@ -2275,5 +2329,10 @@ function registerSpellActions() {
   if (!start && settings.reopen) { try { const s = JSON.parse(localStorage.getItem(STORE) || 'null'); start = s && s.last; } catch (e) {} }
   if (start) { await openProject(start); if (file) openFile(file); }
   updateUI(); syncDisabled();
+  // Results of tasks sent to Agent Studio: text files open here (in the project or not), others with the system's program.
+  if (window.AgentLink) AgentLink.init({app: 'Code Studio', lang: () => lang, open: async path => {
+    if (/\.(png|jpe?g|gif|webp|pdf|docx?|xlsx?|pptx?|zip|mp[34])$/i.test(path)) return false;
+    await openFile(path);
+  }});
   document.body.dataset.ready = '1';
 })();

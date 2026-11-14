@@ -1,12 +1,16 @@
 // Hide the console window in release builds on Windows.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod agentlink;
 mod codespell;
 mod fuzzy;
 mod git;
 mod lsp;
+mod mcp;
+mod mcp_tools;
 mod runconfig;
 mod runnables;
+mod shared;
 mod spell;
 mod symbols;
 mod templates;
@@ -403,18 +407,18 @@ async fn history_read(app: AppHandle, path: String, id: u64) -> Result<Response,
 
 #[tauri::command]
 async fn pick_folder(app: AppHandle) -> Option<String> {
-    app.dialog().file().blocking_pick_folder().and_then(|f| f.into_path().ok()).map(|p| path_str(&p))
+    shared::file_dialog(&app).blocking_pick_folder().and_then(|f| f.into_path().ok()).map(|p| path_str(&p))
 }
 
 #[tauri::command]
 async fn pick_file(app: AppHandle) -> Option<String> {
-    app.dialog().file().blocking_pick_file().and_then(|f| f.into_path().ok()).map(|p| path_str(&p))
+    shared::file_dialog(&app).blocking_pick_file().and_then(|f| f.into_path().ok()).map(|p| path_str(&p))
 }
 
 /// Where to save a file (export); `name` is the suggested file name.
 #[tauri::command]
 async fn pick_save_file(app: AppHandle, name: String) -> Option<String> {
-    app.dialog().file().set_file_name(name).blocking_save_file().and_then(|f| f.into_path().ok()).map(|p| path_str(&p))
+    shared::file_dialog(&app).set_file_name(name).blocking_save_file().and_then(|f| f.into_path().ok()).map(|p| path_str(&p))
 }
 
 #[tauri::command]
@@ -512,6 +516,7 @@ fn texts() -> serde_json::Value {
 }
 
 fn main() {
+    if mcp::wanted() { return mcp_tools::run(); }
     let initial = std::env::args_os()
         .skip(1)
         .map(PathBuf::from)
@@ -532,6 +537,13 @@ fn main() {
         .manage(fuzzy::FileLists::default())
         .invoke_handler(tauri::generate_handler![
             texts,
+            shared::shared_get,
+            shared::shared_set,
+            agentlink::agent_send,
+            agentlink::agent_poll,
+            agentlink::agent_ack,
+            agentlink::agent_open,
+            agentlink::agent_open_file,
             symbols::symbols_of,
             fuzzy::fuzzy_files,
             fuzzy::fuzzy_rank,
