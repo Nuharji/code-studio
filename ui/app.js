@@ -27,7 +27,7 @@ const fmtKey = k => {
 
 /* ================= Settings & state ================= */
 const STORE = 'code-studio';
-const THEMES = ['dark', 'light', 'github', 'github-dark', 'cli', 'cli-amber', 'cli-cyan', 'cli-magenta', 'cli-white', 'midnight', 'dusk', 'graphite', 'contrast', 'sand', 'rose'];
+const THEMES = ['dark', 'light', 'github', 'github-dark', 'cli', 'cli-amber', 'cli-cyan', 'cli-magenta', 'cli-white', 'midnight', 'dusk', 'graphite', 'contrast', 'sand', 'rose', 'proton'];
 /* Menu action of a theme: 'github-dark' → themeGithubDark (the same names as in the other Studio apps). */
 const themeAct = th => 'theme' + th.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join('');
 const DEF = {keys: {}, autoHide: false, lang: 'auto', theme: 'dark', dock: true, dockTab: 'project', dockW: 320, bottom: false, bottomTab: 'terminal', bottomH: 260,
