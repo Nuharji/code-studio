@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.13.0 — 2026-11-25
+Git blame and file history (P-004):
+- Git → Annotate with Git Blame: the date and author of the last change in front of each block of lines, shaded by age (newer is stronger); lines you haven't committed yet are marked. Click an annotation to open that commit in the file's history. Works on the text in the editor, so unsaved changes count as not committed yet.
+- Inline blame: the cursor line shows who changed it last, how long ago and the commit message, at the end of the line (Settings → Editor → View, on by default).
+- Git → Show History for File…: the commits that changed the file (also across renames), each with the file's changes side by side; “Compare with Current” compares a version with the editor's text, “Copy Revision Number” copies the hash.
+
 ## 0.12.0 — 2026-11-14
 What the other Studio apps got meanwhile, now in Code Studio too:
 - Shared settings with all Studio apps: theme and language follow Studio Hub and the other apps (and changes here go to them); folder dialogs and “New Project” start in the shared work folder.

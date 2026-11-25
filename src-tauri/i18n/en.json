@@ -455,5 +455,17 @@
   "agent.tests": "Write tests",
   "agent.testsTask": "Write tests for {name} with the test framework the project already uses, covering the normal cases and the edge cases, and run them.",
   "agent.docs": "Document",
-  "agent.docsTask": "Add documentation comments to {name} in the style the project uses (what each function does, its parameters and results). Do not change the code itself."
+  "agent.docsTask": "Add documentation comments to {name} in the style the project uses (what each function does, its parameters and results). Do not change the code itself.",
+  "a.gitBlame": "Annotate with Git Blame",
+  "a.gitFileHistory": "Show History for File…",
+  "set.inlineBlame": "Inline blame (who changed the cursor line last, and when)",
+  "blame.notCommitted": "Not committed yet",
+  "blame.noHistory": "“{f}” has no commits yet.",
+  "blame.historyOf": "History of {f}",
+  "blame.copyHash": "Copy Revision Number",
+  "blame.compareCurrent": "Compare with Current",
+  "blame.close": "Close",
+  "blame.vsCurrent": "{h} compared with the current text",
+  "blame.changesIn": "Changes in {h}",
+  "blame.firstCommit": "{h} — the file’s first commit"
 }

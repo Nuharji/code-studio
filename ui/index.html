@@ -533,6 +533,10 @@ select:focus,input:focus{border-color:var(--accent)}
 .hist .diff-host{position:absolute;top:30px;left:0;right:0;bottom:0}
 .hist .pp-item{height:auto;padding:6px 12px;display:block}
 .hist .pp-item small{display:block}
+.blame-ann{font-family:var(--font-code);font-size:.85em;white-space:pre;color:var(--dim);border-right:3px solid transparent;margin-right:10px;cursor:pointer}
+.blame-age0{background:rgba(86,156,214,.30)}.blame-age1{background:rgba(86,156,214,.22)}.blame-age2{background:rgba(86,156,214,.15)}.blame-age3{background:rgba(86,156,214,.09)}.blame-age4{background:rgba(86,156,214,.04)}
+.blame-agenew{background:rgba(98,180,90,.20);font-style:italic}
+.blame-inline{color:var(--dim);opacity:.65;font-style:italic}
 .drop{position:fixed;inset:10px;border:2px dashed var(--accent);border-radius:10px;background:rgba(70,35,5,.75);display:none;place-items:center;font-size:20px;color:#fff;z-index:250;pointer-events:none}
 .drop.show{display:grid}
 /* Layouts with the panels on the left (Eigenes, Gespiegelt): the dock's resize handle moves to its right edge */
@@ -645,6 +649,7 @@ html[data-l-dock="left"] .dock-split{left:auto;right:-3px}
 <script src="symbols.js"></script>
 <script src="lsp.js"></script>
 <script src="templates.js"></script>
+<script src="blame.js"></script>
 <script src="shared.js"></script>
 <script src="agentlink.js"></script>
 <script src="app.js"></script>

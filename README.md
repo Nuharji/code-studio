@@ -10,7 +10,8 @@ JetBrains shortcuts, project tree, Find in Files, terminal, local history) and l
 
 Language servers (stage 2): `ui/lsp.js` (protocol client) and `src-tauri/src/lsp.rs` (starts the server, moves messages).
 Live templates (postfix, Surround With): `ui/templates.js`, built-in sets in `src-tauri/templates/builtin.json`, logic in `src-tauri/src/templates.rs`.
-Roadmap: debugger (P-002), Git history / blame / merge conflicts (P-004). No Flatpak: inside its sandbox the terminal can't reach the system's tools.
+Git blame and file history: `ui/blame.js`, backend in `src-tauri/src/git.rs`.
+Roadmap: debugger (P-002), merge conflicts (rest of P-004). No Flatpak: inside its sandbox the terminal can't reach the system's tools.
 
 ## Shared with the other Studio apps
 Theme, layout and language are shared with the other Studio apps (`shared.rs` / `ui/shared.js`, the same files in every

@@ -191,6 +191,137 @@ pub async fn git_switch(root: String, branch: String, create: bool) -> Result<()
     git(&root, &args).map(|_| ())
 }
 
+/// Like `git_raw`, with `input` written to git's stdin (for `blame --contents -`).
+fn git_stdin(root: &str, args: &[&str], input: &str) -> Result<String, String> {
+    use std::io::Write;
+    use std::process::Stdio;
+    let mut c = Command::new("git");
+    c.arg("-C").arg(root).args(args);
+    c.env("GIT_TERMINAL_PROMPT", "0").env("GIT_OPTIONAL_LOCKS", "0");
+    c.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        c.creation_flags(0x0800_0000);
+    }
+    let mut child = c.spawn().map_err(|e| e.to_string())?;
+    let mut stdin = child.stdin.take().ok_or("no stdin")?;
+    let data = input.as_bytes().to_vec();
+    // Write on another thread so a full stdout pipe can't block us.
+    let writer = std::thread::spawn(move || { let _ = stdin.write_all(&data); });
+    let out = child.wait_with_output().map_err(|e| e.to_string())?;
+    let _ = writer.join();
+    if !out.status.success() { return Err(String::from_utf8_lossy(&out.stderr).trim().to_string()); }
+    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+}
+
+#[derive(Serialize, Debug, Default, Clone, PartialEq)]
+pub struct BlameCommit {
+    pub hash: String,
+    pub author: String,
+    /// seconds since 1970
+    pub time: i64,
+    pub summary: String,
+    /// false for lines that aren't committed yet
+    pub committed: bool,
+}
+
+#[derive(Serialize, Debug, Default, PartialEq)]
+pub struct Blame {
+    pub commits: Vec<BlameCommit>,
+    /// for each line (0-based) the index into `commits`
+    pub lines: Vec<usize>,
+}
+
+/// `git blame --porcelain`: a header "<hash> <orig line> <final line> [<group size>]", the commit's details the first
+/// time a commit appears, then the line's text after a tab.
+pub fn parse_blame(out: &str) -> Blame {
+    let mut b = Blame::default();
+    let mut index: std::collections::HashMap<String, usize> = Default::default();
+    let mut cur: Option<usize> = None;
+    for l in out.lines() {
+        if l.starts_with('\t') {
+            if let Some(i) = cur { b.lines.push(i); }
+            continue;
+        }
+        let first = l.split(' ').next().unwrap_or_default();
+        if first.len() == 40 && first.bytes().all(|c| c.is_ascii_hexdigit()) && l.split(' ').count() >= 3 {
+            let i = *index.entry(first.to_string()).or_insert_with(|| {
+                b.commits.push(BlameCommit { hash: first.to_string(), committed: first.bytes().any(|c| c != b'0'), ..Default::default() });
+                b.commits.len() - 1
+            });
+            cur = Some(i);
+            continue;
+        }
+        let Some(i) = cur else { continue };
+        let c = &mut b.commits[i];
+        if let Some(v) = l.strip_prefix("author ") { c.author = v.to_string(); }
+        else if let Some(v) = l.strip_prefix("author-time ") { c.time = v.trim().parse().unwrap_or(0); }
+        else if let Some(v) = l.strip_prefix("summary ") { c.summary = v.to_string(); }
+    }
+    b
+}
+
+/// Who changed each line last — for the text as it is in the editor (`text`), so unsaved lines show as not committed.
+/// None outside a repository or for a file git doesn't know.
+#[tauri::command]
+pub async fn git_blame(path: String, text: String) -> Option<Blame> {
+    let p = Path::new(&path);
+    let dir = p.parent()?.to_str()?;
+    let name = p.file_name()?.to_str()?;
+    git(dir, &["ls-files", "--error-unmatch", "--", name]).ok()?;
+    let out = git_stdin(dir, &["blame", "--porcelain", "--contents", "-", "--", name], &text).ok()?;
+    Some(parse_blame(&out))
+}
+
+#[derive(Serialize, Debug, PartialEq)]
+pub struct LogEntry {
+    pub hash: String,
+    pub short: String,
+    pub author: String,
+    pub time: i64,
+    pub subject: String,
+    /// the file's path in this commit (relative to the top folder) — differs after a rename
+    pub path: String,
+}
+
+/// `git log --follow --name-only --format=%x1e%H%x1f%h%x1f%an%x1f%at%x1f%s`
+pub fn parse_log(out: &str) -> Vec<LogEntry> {
+    out.split('\u{1e}').filter_map(|rec| {
+        let mut lines = rec.lines();
+        let head = lines.next()?;
+        let f: Vec<&str> = head.split('\u{1f}').collect();
+        if f.len() < 5 { return None; }
+        let path = lines.map(str::trim).rfind(|l| !l.is_empty()).unwrap_or_default().to_string();
+        Some(LogEntry { hash: f[0].into(), short: f[1].into(), author: f[2].into(), time: f[3].parse().unwrap_or(0), subject: f[4].into(), path })
+    }).collect()
+}
+
+/// The commits that changed a file (newest first, at most 300), following renames.
+#[tauri::command]
+pub async fn git_file_log(path: String) -> Result<Vec<LogEntry>, String> {
+    let p = Path::new(&path);
+    let dir = p.parent().and_then(|d| d.to_str()).ok_or("bad path")?;
+    let name = p.file_name().and_then(|n| n.to_str()).ok_or("bad path")?;
+    let out = git(dir, &["log", "--follow", "-n", "300", "--name-only", "--format=%x1e%H%x1f%h%x1f%an%x1f%at%x1f%s", "--", name])?;
+    Ok(parse_log(&out))
+}
+
+/// A file's text in a commit (`rel` relative to the top folder `top`); None when it didn't exist there or isn't text.
+#[tauri::command]
+pub async fn git_show_file(top: String, rev: String, rel: String) -> Option<String> {
+    if rev.starts_with('-') || rev.contains(':') { return None; }
+    let bytes = git_raw(&top, &["show", &format!("{rev}:{rel}")]).ok()?;
+    String::from_utf8(bytes).ok()
+}
+
+/// The first parent of a commit, None for the first commit.
+#[tauri::command]
+pub async fn git_parent(top: String, rev: String) -> Option<String> {
+    if rev.starts_with('-') { return None; }
+    git(&top, &["rev-parse", "-q", "--verify", &format!("{rev}^")]).ok().map(|s| s.trim().to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -210,6 +341,24 @@ mod tests {
         assert_eq!(line_changes(base, "a\nB\nc\nd\ne\n"), [(2, 2, "modified"), (5, 5, "added")]);
         assert_eq!(line_changes(base, "a\nd\n"), [(1, 1, "deleted")]);
         assert_eq!(line_changes("x\r\ny\r\n", "x\ny\n"), []);
+    }
+
+    #[test]
+    fn blame_porcelain() {
+        let h1 = "a".repeat(40); let z = "0".repeat(40);
+        let out = format!("{h1} 1 1 2\nauthor Ann\nauthor-mail <a@x>\nauthor-time 1700000000\nsummary First\nfilename f\n\tone\n{h1} 2 2\n\ttwo\n{z} 3 3 1\nauthor Not Committed Yet\nauthor-time 1800000000\nsummary Version of f from -\n\tthree\n");
+        let b = parse_blame(&out);
+        assert_eq!(b.lines, [0, 0, 1]);
+        assert_eq!((b.commits[0].author.as_str(), b.commits[0].time, b.commits[0].summary.as_str(), b.commits[0].committed), ("Ann", 1700000000, "First", true));
+        assert!(!b.commits[1].committed);
+    }
+
+    #[test]
+    fn log_records() {
+        let out = "\u{1e}abc\u{1f}ab\u{1f}Ann\u{1f}17\u{1f}Rename\n\nsrc/new.rs\n\u{1e}def\u{1f}de\u{1f}Bob\u{1f}16\u{1f}Start\n\nold.rs\n";
+        let l = parse_log(out);
+        assert_eq!(l.len(), 2);
+        assert_eq!((l[0].short.as_str(), l[0].path.as_str(), l[1].author.as_str(), l[1].path.as_str(), l[1].time), ("ab", "src/new.rs", "Bob", "old.rs", 16));
     }
 
     /// A real repository: commit, change, stage, branch.
@@ -245,6 +394,16 @@ mod tests {
             git_switch(root.clone(), "feature".into(), true).await.unwrap();
             let b = git_branches(root.clone()).await.unwrap();
             assert_eq!((b.current.as_str(), b.local.len()), ("feature", 2));
+            // Blame with an unsaved line, the file's history and its text in a commit.
+            let bl = git_blame(a.clone(), "one\ntwo\nnew\n".into()).await.unwrap();
+            assert_eq!(bl.lines.len(), 3);
+            assert!(bl.commits[bl.lines[0]].committed && !bl.commits[bl.lines[2]].committed);
+            assert_eq!(bl.commits[bl.lines[0]].summary, "first");
+            let log = git_file_log(a.clone()).await.unwrap();
+            assert_eq!((log.len(), log[0].subject.as_str(), log[0].path.as_str()), (1, "first", "a.txt"));
+            let top = git_status(root.clone()).await.unwrap().top;
+            assert_eq!(git_show_file(top.clone(), log[0].hash.clone(), "a.txt".into()).await.as_deref().map(|s| s.replace("\r\n", "\n")), Some("one\ntwo\n".into()));
+            assert_eq!(git_parent(top, log[0].hash.clone()).await, None);
         });
         let _ = std::fs::remove_dir_all(&dir);
     }

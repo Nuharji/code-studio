@@ -32,7 +32,7 @@ const THEMES = ['dark', 'light', 'github', 'github-dark', 'cli', 'cli-amber', 'c
 const themeAct = th => 'theme' + th.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join('');
 const DEF = {keys: {}, autoHide: false, lang: 'auto', theme: 'dark', dock: true, dockTab: 'project', dockW: 320, bottom: false, bottomTab: 'terminal', bottomH: 260,
   fontSize: 14, tabSize: 4, wordWrap: false, minimap: true, whitespace: false, sticky: true, ligatures: true,
-  autoSave: true, singleClick: true, reopen: true, shell: '', spell: 'auto', formatOnSave: false, lintOnSave: true, useClippy: false};
+  autoSave: true, singleClick: true, reopen: true, shell: '', spell: 'auto', formatOnSave: false, lintOnSave: true, useClippy: false, inlineBlame: true};
 let settings = {...DEF}, recentProjects = [], booted = false;
 const effectiveLang = () => settings.lang === 'auto' ? ((navigator.language || 'en').toLowerCase().startsWith('de') ? 'de' : 'en') : settings.lang;
 function saveState() {
@@ -226,11 +226,12 @@ function makeGroup() {
   $('#editors').append(el);
   const g = {el, tabs: [], active: null, views: new Map(), tabsEl: el.querySelector('.tabs'), host: el.querySelector('.monaco'), img: el.querySelector('.img-view'), emptyEl: el.querySelector('.ed-empty')};
   g.editor = monaco.editor.create(g.host, {...editorOptions(), model: null});
-  g.editor.onDidFocusEditorWidget(() => focusGroup(g));
-  g.editor.onDidChangeCursorPosition(e => { if (g === focused) { updateStatus(); scheduleCrumbs(); } if (e.reason === 3 || e.source === 'api') return; });
+  g.editor.onDidFocusEditorWidget(() => { focusGroup(g); groups.forEach(GitBlame.cursor); });
+  g.editor.onDidChangeCursorPosition(e => { if (g === focused) { updateStatus(); scheduleCrumbs(); } GitBlame.cursor(g); if (e.reason === 3 || e.source === 'api') return; });
   g.editor.onDidChangeCursorSelection(() => { if (g === focused) updateStatus(); });
-  g.editor.onDidChangeModelContent(() => { renderTabs(g); updateUI(); scheduleStructure(); scheduleSpell(g.editor.getModel()); scheduleGutter(files.get(g.active)); scheduleRunnables(files.get(g.active)); });
+  g.editor.onDidChangeModelContent(() => { renderTabs(g); updateUI(); scheduleStructure(); scheduleSpell(g.editor.getModel()); scheduleGutter(files.get(g.active)); scheduleRunnables(files.get(g.active)); GitBlame.changed(files.get(g.active)); });
   g.editor.onMouseDown(e => {
+    if (e.event.leftButton && GitBlame.click(g, e)) return;
     if (e.target.type !== monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN || !e.event.leftButton) return;
     const r = runnableAt(files.get(g.active), e.target.position.lineNumber); if (r) runRunnable(r);
   });
@@ -322,7 +323,7 @@ function renderGroup(g) {
   const f = files.get(g.active);
   g.host.hidden = !f || f.kind !== 'text'; g.img.hidden = !f || f.kind !== 'image'; g.emptyEl.hidden = !!f;
   if (f && f.kind === 'text') {
-    if (g.editor.getModel() !== f.model) { g.editor.setModel(f.model); const vs = g.views.get(f.path); if (vs) g.editor.restoreViewState(vs); }
+    if (g.editor.getModel() !== f.model) { g.editor.setModel(f.model); const vs = g.views.get(f.path); if (vs) g.editor.restoreViewState(vs); GitBlame.cursor(g); }
   } else g.editor.setModel(null);
   if (f && f.kind === 'image') { g.img.querySelector('img').src = f.url; g.img.querySelector('.cap').textContent = `${baseName(f.path)} · ${(f.size / 1024).toFixed(1)} KB`; }
   renderTabs(g);
@@ -1069,7 +1070,7 @@ $('#bottomTabs').addEventListener('click', e => {
 /* Through the installed git (Rust: git.rs). The Git panel lists changed files — a checkmark stages a file — with the
    commit message below; the status bar shows the branch (click: switch / new / push / pull); changed lines get a mark
    next to the line numbers, changed files a color in the project tree. Push and pull run in a bottom-panel tab. */
-let git = {repo: false, top: '', branch: '', ahead: 0, behind: 0, files: []}, gitT = 0, gitBusy = false;
+let git = {repo: false, top: '', branch: '', ahead: 0, behind: 0, files: []}, gitT = 0, gitBusy = false, lastGitSig = '';
 const gitAbs = rel => join(git.top, rel);
 const gitStaged = f => f.x !== ' ' && f.x !== '?';
 const gitChanged = f => f.y !== ' ';
@@ -1080,6 +1081,8 @@ async function refreshGit() {
   const s = await invoke('git_status', {root: project.root}).catch(e => ({repo: false, error: String(e)}));
   git = {...s, files: s.files || []};
   renderGit(); renderTree();
+  const sig = git.repo ? git.top + '|' + git.branch + '|' + git.ahead + '|' + git.files.map(x => x.x + x.y + x.path).join(',') : '';
+  if (sig !== lastGitSig) { lastGitSig = sig; GitBlame.gitChanged(); }
   const f = curFile(); if (f && f.kind === 'text' && f.model) scheduleGutter(f, 50);
 }
 const gitStateOf = path => { if (!git.repo) return null; const f = git.files.find(x => gitAbs(x.path) === path); return f ? gitCode(f) : null; };
@@ -1671,6 +1674,7 @@ const A = {
   gitCommit: () => gitCommit(), gitPush: () => gitHandle('push'), gitPull: () => gitHandle('pull'), gitPanel: togglePanel('git'),
   gitBranches: async () => { const items = await gitBranchMenu(); if (items) invoke('context_menu', {items: items.map(i => i ? {id: i.id, label: i.label, enabled: i.enabled !== false, checked: i.checked, accel: i.accel || null} : {})}); },
   gitRefresh: () => refreshGit(),
+  gitBlame: () => GitBlame.toggle(), gitFileHistory: () => GitBlame.history(),
   run: () => runSelected(), runFile: () => runCurrentFile(), stopRun: () => stopRun(), editRunConfigs: () => editRunConfigs(),
   toggleAutoHide: () => { settings.autoHide = !settings.autoHide; applySettings(); },
   newProject, openFolder: async () => { const p = await invoke('pick_folder'); if (p) openProject(p); }, closeProject: () => closeProject(false),
@@ -1753,7 +1757,7 @@ const MENUS = [
     ['goToDefinition', 'Ctrl+B'], ['goToImplementation', 'Ctrl+Alt+B'], ['findUsages', 'Alt+F7'], ['selectInProject', 'Alt+F1'], '-', ['nextTab', 'Alt+ArrowRight'], ['prevTab', 'Alt+ArrowLeft']]],
   ['code', [['quickFix', 'Alt+Enter'], ['quickDoc', 'Ctrl+Q'], ['parameterInfo', 'Ctrl+P'], '-', ['surroundWith', 'Ctrl+Alt+T'], ['editTemplates'], '-', ['formatCode', 'Ctrl+Alt+L'], ['optimizeImports', 'Ctrl+Alt+O'], ['fixLint'], ['clippyFix'], ['commentLine', 'Ctrl+/'], ['blockComment', 'Ctrl+Shift+/', null, false, ['Ctrl+?']], '-', ['renameSymbol', 'Shift+F6'], '-', ['sendToAgent'], '-',
     ['fold', 'Ctrl+-'], ['unfold', 'Ctrl+=', null, false, ['Ctrl++']], ['foldAll', 'Ctrl+Shift+-', null, false, ['Ctrl+_']], ['unfoldAll', 'Ctrl+Shift+=']]],
-  ['git', [['gitCommit', 'Ctrl+K'], ['gitPush', 'Ctrl+Shift+K'], ['gitPull', 'Ctrl+T'], '-', ['gitBranches'], ['gitPanel', 'Alt+0'], ['gitRefresh']]],
+  ['git', [['gitCommit', 'Ctrl+K'], ['gitPush', 'Ctrl+Shift+K'], ['gitPull', 'Ctrl+T'], '-', ['gitBlame', null, () => GitBlame.isOn(curFile())], ['gitFileHistory'], '-', ['gitBranches'], ['gitPanel', 'Alt+0'], ['gitRefresh']]],
   ['run', [['run', 'Shift+F10'], ['runFile', 'Ctrl+Shift+F10'], ['stopRun', 'Ctrl+F2'], '-', ['editRunConfigs']]],
   ['settings', [['settings', 'Ctrl+Alt+S'], '-', '#menu.language',
     ['langAuto', null, () => settings.lang === 'auto'], ['langEn', null, () => settings.lang === 'en'], ['langDe', null, () => settings.lang === 'de'],
@@ -1768,7 +1772,7 @@ function buildKeymap() {
 }
 buildKeymap();
 const NEEDS_EDITOR = new Set(['surroundWith', 'optimizeImports', 'fixLint', 'runFile', 'undo', 'redo', 'duplicateLine', 'deleteLine', 'moveLineUp', 'moveLineDown', 'expandSelection', 'shrinkSelection', 'addNextOccurrence',
-  'selectAllOccurrences', 'find', 'replace', 'goToLine', 'goToDefinition', 'goToImplementation', 'findUsages', 'quickFix', 'quickDoc', 'parameterInfo', 'formatCode', 'commentLine', 'blockComment', 'fold', 'unfold', 'foldAll', 'unfoldAll', 'localHistory']);
+  'selectAllOccurrences', 'find', 'replace', 'goToLine', 'goToDefinition', 'goToImplementation', 'findUsages', 'quickFix', 'quickDoc', 'parameterInfo', 'formatCode', 'commentLine', 'blockComment', 'fold', 'unfold', 'foldAll', 'unfoldAll', 'localHistory', 'gitBlame', 'gitFileHistory']);
 const NO_PROJECT = new Set(['editTemplates', 'toggleAutoHide', 'newProject', 'openFolder', 'settings', 'langAuto', 'langEn', 'langDe', ...THEMES.map(themeAct),
   'shortcuts', 'about', 'togglePanels', 'hideAll', 'wordWrap', 'minimap', 'whitespace', 'findAction', 'searchEverywhere']);
 function allowed(act) {
@@ -1969,7 +1973,7 @@ function renderSettings() {
       (window.Shared ? Shared.layoutHeading() : ''),
     editor: `<h3>${t('set.font')}</h3><select class="num-in" data-sel="fontSize">${[11, 12, 13, 14, 15, 16, 18, 20, 22, 24].map(n => opt(n, n + ' px', settings.fontSize)).join('')}</select>
       <h3>${t('set.tabSize')}</h3><select class="num-in" data-sel="tabSize">${[2, 4, 8].map(n => opt(n, n, settings.tabSize)).join('')}</select>
-      <h3>${t('set.view')}</h3>${sw('wordWrap', t('a.wordWrap'))}${sw('minimap', t('a.minimap'))}${sw('whitespace', t('a.whitespace'))}${sw('sticky', t('set.sticky'))}${sw('ligatures', t('set.ligatures'))}
+      <h3>${t('set.view')}</h3>${sw('wordWrap', t('a.wordWrap'))}${sw('minimap', t('a.minimap'))}${sw('whitespace', t('a.whitespace'))}${sw('sticky', t('set.sticky'))}${sw('ligatures', t('set.ligatures'))}${sw('inlineBlame', t('set.inlineBlame'))}
       <h3>${t('set.onSave')}</h3>${sw('formatOnSave', t('set.formatOnSave'))}${sw('lintOnSave', t('set.lintOnSave'))}${sw('useClippy', t('set.useClippy'))}
       <h3>${t('set.spell')}</h3><p class="hint">${t('set.spellHint')}</p><select class="wide-sel" data-sel="spell">${opt('auto', t('set.spellAuto'), settings.spell)}${opt('de', 'Deutsch', settings.spell)}${opt('en', 'English', settings.spell)}${opt('off', t('set.spellOff'), settings.spell)}</select>`,
     templates: `<div id="tplBox"></div>`,
@@ -2036,6 +2040,7 @@ function applySettings() {
     const o = editorOptions(); delete o.theme;
     groups.forEach(g => g.editor.updateOptions(o));
     for (const f of files.values()) if (f.kind === 'text') f.model.updateOptions({tabSize: settings.tabSize});
+    groups.forEach(GitBlame.cursor);
   }
   terms.forEach(tm => { tm.xterm.options.theme = termTheme(); tm.xterm.options.fontSize = Math.max(11, settings.fontSize - 1); });
   applyLayout();

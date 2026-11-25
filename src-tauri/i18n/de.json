@@ -455,5 +455,17 @@
   "agent.tests": "Tests schreiben",
   "agent.testsTask": "Schreibe Tests für {name} mit dem Test-Framework, das das Projekt schon nutzt — für die normalen Fälle und die Randfälle — und lass sie laufen.",
   "agent.docs": "Dokumentieren",
-  "agent.docsTask": "Ergänze Dokumentationskommentare in {name} im Stil des Projekts (was jede Funktion macht, ihre Parameter und Ergebnisse). Ändere den Code selbst nicht."
+  "agent.docsTask": "Ergänze Dokumentationskommentare in {name} im Stil des Projekts (was jede Funktion macht, ihre Parameter und Ergebnisse). Ändere den Code selbst nicht.",
+  "a.gitBlame": "Mit Git Blame annotieren",
+  "a.gitFileHistory": "Verlauf der Datei anzeigen…",
+  "set.inlineBlame": "Inline-Blame (wer die Cursorzeile zuletzt geändert hat, und wann)",
+  "blame.notCommitted": "Noch nicht committet",
+  "blame.noHistory": "„{f}“ hat noch keine Commits.",
+  "blame.historyOf": "Verlauf von {f}",
+  "blame.copyHash": "Revisionsnummer kopieren",
+  "blame.compareCurrent": "Mit aktuellem Stand vergleichen",
+  "blame.close": "Schließen",
+  "blame.vsCurrent": "{h} verglichen mit dem aktuellen Text",
+  "blame.changesIn": "Änderungen in {h}",
+  "blame.firstCommit": "{h} — der erste Commit der Datei"
 }
